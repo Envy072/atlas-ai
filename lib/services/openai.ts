@@ -95,26 +95,35 @@ function getOpenAIClient(): OpenAI {
   return openaiClient;
 }
 
-// Calls the model and returns the parsed (but not yet schema-validated)
-// JSON payload. Validation is the analysis service's job, not this one.
-export async function generateStartupAnalysis(idea: string): Promise<unknown> {
+export interface ChatCompletionParams {
+  systemPrompt: string;
+  userPrompt: string;
+  temperature?: number;
+}
+
+// Generic entry point: send a system/user prompt pair to the model and
+// return the parsed (but not yet schema-validated) JSON payload. This is
+// the one place that actually talks to the OpenAI SDK — every caller in
+// this codebase, including the analysis pipeline's individual stages,
+// goes through this function rather than constructing its own client call.
+export async function runChatCompletion(params: ChatCompletionParams): Promise<unknown> {
   const openai = getOpenAIClient();
 
   const response = await openai.chat.completions
     .create({
       model: "gpt-4.1-mini",
-      temperature: 0.7,
+      temperature: params.temperature ?? 0.7,
       response_format: {
         type: "json_object",
       },
       messages: [
         {
           role: "system",
-          content: ATLAS_SYSTEM_PROMPT,
+          content: params.systemPrompt,
         },
         {
           role: "user",
-          content: idea,
+          content: params.userPrompt,
         },
       ],
     })
@@ -135,4 +144,14 @@ export async function generateStartupAnalysis(idea: string): Promise<unknown> {
       "Received malformed JSON from the analysis engine."
     );
   }
+}
+
+// Calls the model with the full-analysis Atlas prompt and returns the
+// parsed (but not yet schema-validated) JSON payload. Validation is the
+// analysis service's job, not this one.
+export async function generateStartupAnalysis(idea: string): Promise<unknown> {
+  return runChatCompletion({
+    systemPrompt: ATLAS_SYSTEM_PROMPT,
+    userPrompt: idea,
+  });
 }
