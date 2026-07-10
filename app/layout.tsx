@@ -25,8 +25,22 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* Applies the saved theme before first paint, so there's no
+            flash of the wrong theme. See CLAUDE.md Section 10 / 9 — the
+            .dark class this toggles is the same one globals.css already
+            defines tokens for. suppressHydrationWarning on <html> above
+            is required since this script edits the DOM before React
+            hydrates. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("atlas-ai-theme");var isDark=t?t==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;if(isDark)document.documentElement.classList.add("dark")}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

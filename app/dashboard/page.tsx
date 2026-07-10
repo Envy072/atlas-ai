@@ -1,10 +1,8 @@
-import DashboardLayout from "@/components/dashboard/DashboardLayout";
-import AIWorkspace from "@/components/dashboard/AIWorkspace";
+import { listProjects } from "@/lib/services/projects";
+import DashboardHome from "@/components/dashboard/home/DashboardHome";
 
-export default function DashboardPage() {
-  return (
-    <DashboardLayout>
-      <AIWorkspace />
-    </DashboardLayout>
-  );
+export default async function DashboardPage() {
+  const projects = await listProjects();
+
+  return <DashboardHome projects={projects} />;
 }

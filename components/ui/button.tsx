@@ -44,11 +44,21 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  nativeButton,
+  render,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
   return (
     <ButtonPrimitive
       data-slot="button"
+      render={render}
+      // Base UI's Button expects a native <button> by default. Whenever a
+      // caller substitutes a different element via `render` (almost always
+      // a next/link Link, to make something "look like a button"), default
+      // to non-native semantics automatically instead of requiring every
+      // call site to remember this — an explicit nativeButton prop still
+      // wins if a caller passes one.
+      nativeButton={nativeButton ?? render === undefined}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

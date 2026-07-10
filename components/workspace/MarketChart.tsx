@@ -7,6 +7,7 @@ import {
   XAxis,
   Tooltip,
 } from "recharts";
+import { Card } from "@/components/ui/card";
 
 const data = [
   { year: "2025", value: 120 },
@@ -18,33 +19,37 @@ const data = [
 
 export default function MarketChart() {
   return (
-    <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-
-      <h2 className="mb-6 text-2xl font-bold">
-        Market Growth
-      </h2>
+    <Card className="p-6">
+      <h2 className="mb-6 text-2xl font-bold text-card-foreground">Market Growth</h2>
 
       <div className="h-72">
-
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data}>
+            <XAxis
+              dataKey="year"
+              stroke="var(--muted-foreground)"
+              tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+            />
 
-            <XAxis dataKey="year" />
-
-            <Tooltip />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "var(--popover)",
+                borderColor: "var(--border)",
+                borderRadius: "0.75rem",
+                color: "var(--popover-foreground)",
+              }}
+            />
 
             <Area
               type="monotone"
               dataKey="value"
-              stroke="#2563eb"
-              fill="#93c5fd"
+              stroke="var(--chart-1)"
+              fill="var(--chart-1)"
+              fillOpacity={0.2}
             />
-
           </AreaChart>
         </ResponsiveContainer>
-
       </div>
-
-    </div>
+    </Card>
   );
 }

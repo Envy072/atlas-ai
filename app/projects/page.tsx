@@ -1,49 +1,61 @@
+import { FolderKanban } from "lucide-react";
 import { listProjects } from "@/lib/services/projects";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { H1, Small, Body } from "@/components/ui/typography";
+import EmptyState from "@/components/shared/EmptyState";
 
 export default async function ProjectsPage() {
   const projects = await listProjects();
 
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-8">Projects</h1>
+    <div className="mx-auto max-w-5xl p-8">
+      <H1 className="mb-8">Projects</H1>
 
-      <div className="grid gap-6">
-        {projects?.map((project) => (
-          <div
-            key={project.id}
-            className="rounded-2xl border p-6 shadow-sm bg-white"
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">
-                {project.title}
-              </h2>
+      {projects.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={FolderKanban}
+            title="No projects yet"
+            description="Every startup idea you analyze is saved here, most recent first."
+          />
+        </Card>
+      ) : (
+        <div className="grid gap-6">
+          {projects.map((project) => (
+            <Card
+              key={project.id}
+              className="p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <h2 className="text-2xl font-bold tracking-tight text-card-foreground">
+                  {project.title}
+                </h2>
 
-              <div className="text-3xl font-bold text-blue-600">
-                {project.score}
-              </div>
-            </div>
-
-            <p className="text-gray-600 mb-6">
-              {project.summary}
-            </p>
-
-            <div className="grid md:grid-cols-2 gap-6">
-
-              <div>
-                <h3 className="font-bold mb-2">Problem</h3>
-                <p>{project.problem}</p>
-              </div>
-
-              <div>
-                <h3 className="font-bold mb-2">Solution</h3>
-                <p>{project.solution}</p>
+                {typeof project.score === "number" && (
+                  <Badge variant={project.score >= 70 ? "success" : "warning"}>
+                    Score {project.score}
+                  </Badge>
+                )}
               </div>
 
-            </div>
+              <Body className="mb-6 text-muted-foreground">{project.summary}</Body>
 
-          </div>
-        ))}
-      </div>
+              <div className="grid gap-6 md:grid-cols-2">
+                <div>
+                  <Small className="mb-2 block text-muted-foreground">Problem</Small>
+                  <p className="leading-7 text-card-foreground">{project.problem}</p>
+                </div>
+
+                <div>
+                  <Small className="mb-2 block text-muted-foreground">Solution</Small>
+                  <p className="leading-7 text-card-foreground">{project.solution}</p>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
