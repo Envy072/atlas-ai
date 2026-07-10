@@ -9,6 +9,8 @@ import {
   Briefcase,
   type LucideIcon,
 } from "lucide-react";
+import SectionHeader from "@/components/shared/SectionHeader";
+import IconBadge from "@/components/shared/IconBadge";
 
 function Section({
   icon: Icon,
@@ -24,11 +26,7 @@ function Section({
 
       <div className="mb-5 flex items-center gap-3">
 
-        <div className="rounded-xl bg-blue-100 p-3">
-
-          <Icon className="h-6 w-6 text-blue-600" />
-
-        </div>
+        <IconBadge icon={Icon} size="sm" />
 
         <h3 className="text-xl font-bold">
           {title}
@@ -45,24 +43,17 @@ function Section({
 }
 
 export default function AnalysisOverview() {
-  const { analysis } = useAnalysisStore();
+  const analysis = useAnalysisStore((state) => state.analysis);
 
   if (!analysis) return null;
 
   return (
     <section className="space-y-6">
 
-      <div>
-
-        <p className="text-sm font-semibold uppercase tracking-widest text-blue-600">
-          Startup Overview
-        </p>
-
-        <h2 className="mt-2 text-3xl font-bold">
-          Business Analysis
-        </h2>
-
-      </div>
+      <SectionHeader
+        eyebrow="Startup Overview"
+        heading="Business Analysis"
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
 

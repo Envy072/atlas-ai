@@ -4,7 +4,8 @@ import { Sparkles, Clock3 } from "lucide-react";
 import { useAnalysisStore } from "@/lib/store/analysisStore";
 
 export default function WorkspaceHeader() {
-  const { analysis, loading } = useAnalysisStore();
+  const analysis = useAnalysisStore((state) => state.analysis);
+  const loading = useAnalysisStore((state) => state.loading);
 
   return (
     <section className="rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 p-8 text-white shadow-xl">

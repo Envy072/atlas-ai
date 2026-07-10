@@ -1,10 +1,7 @@
-import { supabase } from "@/lib/supabase";
+import { listProjects } from "@/lib/services/projects";
 
 export default async function ProjectsPage() {
-  const { data: projects } = await supabase
-    .from("projects")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const projects = await listProjects();
 
   return (
     <div className="p-8">

@@ -2,30 +2,21 @@
 
 import { CheckCircle2 } from "lucide-react";
 import { useAnalysisStore } from "@/lib/store/analysisStore";
+import SectionHeader from "@/components/shared/SectionHeader";
 
 export default function RoadmapCard() {
-  const { analysis } = useAnalysisStore();
+  const analysis = useAnalysisStore((state) => state.analysis);
 
   if (!analysis) return null;
 
   return (
     <section className="space-y-8">
 
-      <div>
-
-        <p className="text-sm font-semibold uppercase tracking-widest text-blue-600">
-          Roadmap
-        </p>
-
-        <h2 className="mt-2 text-3xl font-bold">
-          Recommended Next Steps
-        </h2>
-
-        <p className="mt-3 text-gray-500">
-          Atlas AI recommends the following execution plan.
-        </p>
-
-      </div>
+      <SectionHeader
+        eyebrow="Roadmap"
+        heading="Recommended Next Steps"
+        description="Atlas AI recommends the following execution plan."
+      />
 
       <div className="space-y-5">
 

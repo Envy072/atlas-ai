@@ -2,15 +2,14 @@
 
 import { useAnalysisStore } from "@/lib/store/analysisStore";
 import { useAnalyzeStartup } from "@/hooks/useAnalyzeStartup";
-import { Loader2, Send, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
+import AnalyzeButtonLabel from "@/components/shared/AnalyzeButtonLabel";
 
 export default function IdeaInput() {
-  const {
-    loading,
-    analysis,
-    setLoading,
-    setAnalysis,
-  } = useAnalysisStore();
+  const loading = useAnalysisStore((state) => state.loading);
+  const analysis = useAnalysisStore((state) => state.analysis);
+  const setLoading = useAnalysisStore((state) => state.setLoading);
+  const setAnalysis = useAnalysisStore((state) => state.setAnalysis);
 
   const { analyze } = useAnalyzeStartup({
     onStart: () => setLoading(true),
@@ -94,17 +93,7 @@ export default function IdeaInput() {
           disabled={loading}
           className="flex items-center gap-3 rounded-2xl bg-blue-600 px-8 py-4 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Analyzing...
-            </>
-          ) : (
-            <>
-              <Send className="h-5 w-5" />
-              Analyze Startup
-            </>
-          )}
+          <AnalyzeButtonLabel loading={loading} />
         </button>
       </div>
     </section>

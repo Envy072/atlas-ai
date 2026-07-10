@@ -1,6 +1,7 @@
 "use client";
 
 import { TrendingUp, Brain, FolderKanban } from "lucide-react";
+import { formatPercent } from "@/lib/format";
 
 export default function RightPanel() {
   return (
@@ -28,7 +29,7 @@ export default function RightPanel() {
         </div>
 
         <p className="text-3xl font-bold">
-          96%
+          {formatPercent(96)}
         </p>
 
       </div>

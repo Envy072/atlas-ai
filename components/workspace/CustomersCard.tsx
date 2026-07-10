@@ -2,40 +2,28 @@
 
 import { Users } from "lucide-react";
 import { useAnalysisStore } from "@/lib/store/analysisStore";
+import SectionHeader from "@/components/shared/SectionHeader";
+import IconBadge from "@/components/shared/IconBadge";
 
 export default function CustomersCard() {
-  const { analysis } = useAnalysisStore();
+  const analysis = useAnalysisStore((state) => state.analysis);
 
   if (!analysis) return null;
 
   return (
     <section className="space-y-8">
 
-      <div>
-
-        <p className="text-sm font-semibold uppercase tracking-widest text-blue-600">
-          Target Customers
-        </p>
-
-        <h2 className="mt-2 text-3xl font-bold">
-          Customer Profile
-        </h2>
-
-        <p className="mt-3 text-gray-500">
-          Atlas AI identified the primary audience for this startup.
-        </p>
-
-      </div>
+      <SectionHeader
+        eyebrow="Target Customers"
+        heading="Customer Profile"
+        description="Atlas AI identified the primary audience for this startup."
+      />
 
       <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
 
         <div className="mb-6 flex items-center gap-4">
 
-          <div className="rounded-2xl bg-blue-100 p-4">
-
-            <Users className="h-7 w-7 text-blue-600" />
-
-          </div>
+          <IconBadge icon={Users} />
 
           <div>
 

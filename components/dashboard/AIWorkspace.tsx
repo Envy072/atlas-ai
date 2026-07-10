@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, Send, Loader2 } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import AIMetrics from "./AIMetrics";
 import AtlasVerdict from "./AtlasVerdict";
 import MarketChart from "@/components/workspace/MarketChart";
 import { useAnalyzeStartup } from "@/hooks/useAnalyzeStartup";
+import AnalyzeButtonLabel from "@/components/shared/AnalyzeButtonLabel";
+import LoadingChecklist from "@/components/shared/LoadingChecklist";
 
 export default function AIWorkspace() {
   const [idea, setIdea] = useState("");
@@ -55,64 +57,24 @@ export default function AIWorkspace() {
           disabled={loading}
           className="flex items-center gap-2 rounded-2xl bg-blue-600 px-8 py-4 font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
         >
-          {loading ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Analyzing...
-            </>
-          ) : (
-            <>
-              <Send className="h-5 w-5" />
-              Analyze Startup
-            </>
-          )}
+          <AnalyzeButtonLabel loading={loading} />
         </button>
       </div>
 
       {/* Loading */}
 
       {loading && (
-        <div className="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-6">
-
-          <h3 className="mb-6 text-xl font-bold">
-            🚀 Atlas is building your startup...
-          </h3>
-
-          <div className="space-y-4 text-gray-700">
-
-            <div className="flex items-center gap-3">
-              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-              Understanding Idea
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-              Market Research
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-              Competitor Analysis
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-              Business Model
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-              Financial Projection
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-              Roadmap
-            </div>
-
-          </div>
-
-        </div>
+        <LoadingChecklist
+          title="🚀 Atlas is building your startup..."
+          items={[
+            "Understanding Idea",
+            "Market Research",
+            "Competitor Analysis",
+            "Business Model",
+            "Financial Projection",
+            "Roadmap",
+          ]}
+        />
       )}
 
       {/* Result */}

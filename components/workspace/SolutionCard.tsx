@@ -2,40 +2,33 @@
 
 import { Lightbulb } from "lucide-react";
 import { useAnalysisStore } from "@/lib/store/analysisStore";
+import SectionHeader from "@/components/shared/SectionHeader";
+import IconBadge from "@/components/shared/IconBadge";
 
 export default function SolutionCard() {
-  const { analysis } = useAnalysisStore();
+  const analysis = useAnalysisStore((state) => state.analysis);
 
   if (!analysis) return null;
 
   return (
     <section className="space-y-8">
 
-      <div>
-
-        <p className="text-sm font-semibold uppercase tracking-widest text-green-600">
-          Solution
-        </p>
-
-        <h2 className="mt-2 text-3xl font-bold">
-          Proposed Solution
-        </h2>
-
-        <p className="mt-3 text-gray-500">
-          Atlas AI evaluation of the proposed product or service.
-        </p>
-
-      </div>
+      <SectionHeader
+        eyebrow="Solution"
+        eyebrowClassName="text-green-600"
+        heading="Proposed Solution"
+        description="Atlas AI evaluation of the proposed product or service."
+      />
 
       <div className="rounded-3xl border border-green-100 bg-white p-8 shadow-sm">
 
         <div className="mb-6 flex items-center gap-4">
 
-          <div className="rounded-2xl bg-green-100 p-4">
-
-            <Lightbulb className="h-7 w-7 text-green-600" />
-
-          </div>
+          <IconBadge
+            icon={Lightbulb}
+            bgClassName="bg-green-100"
+            textClassName="text-green-600"
+          />
 
           <div>
 

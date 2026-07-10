@@ -20,7 +20,7 @@ const tabs = [
 export default function Tabs() {
   const [active, setActive] = useState("Overview");
 
-  const { analysis } = useAnalysisStore();
+  const analysis = useAnalysisStore((state) => state.analysis);
 
   if (!analysis) return null;
 

@@ -1,7 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnalysisResultSchema, type AnalysisResult } from "@/lib/schemas/analysis";
+import { postJSON } from "@/lib/http/apiClient";
+import { parseOrThrow } from "@/lib/validation/parse";
+import { getErrorMessage } from "@/lib/errors";
 
 interface UseAnalyzeStartupCallbacks {
   onStart?: () => void;
@@ -29,53 +32,49 @@ export function useAnalyzeStartup(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const analyze = useCallback(
-    async (idea: string) => {
-      if (!idea.trim()) return null;
+  // Callers typically pass a fresh callbacks object every render; keeping
+  // the latest one in a ref (rather than a useCallback dependency) means
+  // `analyze` keeps a stable identity instead of being recreated each time.
+  // The ref is synced in an effect (not during render) since `analyze` is
+  // only ever invoked from event handlers, after effects have committed.
+  const callbacksRef = useRef(callbacks);
 
-      setLoading(true);
-      setError(null);
-      setAnalysis(null);
-      callbacks?.onStart?.();
+  useEffect(() => {
+    callbacksRef.current = callbacks;
+  });
 
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            message: idea,
-          }),
-        });
+  const analyze = useCallback(async (idea: string) => {
+    if (!idea.trim()) return null;
 
-        const data = await res.json();
-        const parsed = AnalysisResultSchema.safeParse(data);
+    setLoading(true);
+    setError(null);
+    setAnalysis(null);
+    callbacksRef.current?.onStart?.();
 
-        if (!parsed.success) {
-          throw new Error(
-            data?.error ?? "Received an unexpected response from the analysis API."
-          );
-        }
+    try {
+      const data = await postJSON<unknown>("/api/chat", { message: idea });
+      const result = parseOrThrow(
+        AnalysisResultSchema,
+        data,
+        "Received an unexpected response from the analysis API."
+      );
 
-        setAnalysis(parsed.data);
-        callbacks?.onSuccess?.(parsed.data);
+      setAnalysis(result);
+      callbacksRef.current?.onSuccess?.(result);
 
-        return parsed.data;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Something went wrong.";
+      return result;
+    } catch (err) {
+      const message = getErrorMessage(err);
 
-        setError(message);
-        callbacks?.onError?.(message);
+      setError(message);
+      callbacksRef.current?.onError?.(message);
 
-        return null;
-      } finally {
-        setLoading(false);
-        callbacks?.onSettled?.();
-      }
-    },
-    [callbacks]
-  );
+      return null;
+    } finally {
+      setLoading(false);
+      callbacksRef.current?.onSettled?.();
+    }
+  }, []);
 
   return { analysis, loading, error, analyze };
 }

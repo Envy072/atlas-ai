@@ -2,30 +2,23 @@
 
 import { TrendingUp } from "lucide-react";
 import { useAnalysisStore } from "@/lib/store/analysisStore";
+import SectionHeader from "@/components/shared/SectionHeader";
+import IconBadge from "@/components/shared/IconBadge";
 
 export default function OpportunitiesCard() {
-  const { analysis } = useAnalysisStore();
+  const analysis = useAnalysisStore((state) => state.analysis);
 
   if (!analysis) return null;
 
   return (
     <section className="space-y-8">
 
-      <div>
-
-        <p className="text-sm font-semibold uppercase tracking-widest text-green-600">
-          Opportunities
-        </p>
-
-        <h2 className="mt-2 text-3xl font-bold">
-          Growth Opportunities
-        </h2>
-
-        <p className="mt-3 text-gray-500">
-          Atlas AI identified the strongest opportunities for growth.
-        </p>
-
-      </div>
+      <SectionHeader
+        eyebrow="Opportunities"
+        eyebrowClassName="text-green-600"
+        heading="Growth Opportunities"
+        description="Atlas AI identified the strongest opportunities for growth."
+      />
 
       <div className="space-y-5">
 
@@ -37,11 +30,12 @@ export default function OpportunitiesCard() {
 
             <div className="flex items-start gap-4">
 
-              <div className="rounded-2xl bg-green-100 p-3">
-
-                <TrendingUp className="h-6 w-6 text-green-600" />
-
-              </div>
+              <IconBadge
+                icon={TrendingUp}
+                size="md"
+                bgClassName="bg-green-100"
+                textClassName="text-green-600"
+              />
 
               <div>
 

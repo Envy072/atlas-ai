@@ -2,30 +2,22 @@
 
 import { useAnalysisStore } from "@/lib/store/analysisStore";
 import { Users, ShieldCheck } from "lucide-react";
+import SectionHeader from "@/components/shared/SectionHeader";
+import IconBadge from "@/components/shared/IconBadge";
 
 export default function CompetitionCard() {
-  const { analysis } = useAnalysisStore();
+  const analysis = useAnalysisStore((state) => state.analysis);
 
   if (!analysis) return null;
 
   return (
     <section className="space-y-8">
 
-      <div>
-
-        <p className="text-sm font-semibold uppercase tracking-widest text-blue-600">
-          Competition
-        </p>
-
-        <h2 className="mt-2 text-3xl font-bold">
-          Competitive Analysis
-        </h2>
-
-        <p className="mt-3 text-gray-500">
-          Atlas AI assessment of the competitive landscape.
-        </p>
-
-      </div>
+      <SectionHeader
+        eyebrow="Competition"
+        heading="Competitive Analysis"
+        description="Atlas AI assessment of the competitive landscape."
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
 
@@ -33,11 +25,7 @@ export default function CompetitionCard() {
 
           <div className="mb-5 flex items-center gap-3">
 
-            <div className="rounded-xl bg-blue-100 p-3">
-
-              <Users className="h-6 w-6 text-blue-600" />
-
-            </div>
+            <IconBadge icon={Users} size="sm" />
 
             <h3 className="text-xl font-bold">
               Market Competition
@@ -55,11 +43,12 @@ export default function CompetitionCard() {
 
           <div className="mb-5 flex items-center gap-3">
 
-            <div className="rounded-xl bg-green-100 p-3">
-
-              <ShieldCheck className="h-6 w-6 text-green-600" />
-
-            </div>
+            <IconBadge
+              icon={ShieldCheck}
+              size="sm"
+              bgClassName="bg-green-100"
+              textClassName="text-green-600"
+            />
 
             <h3 className="text-xl font-bold">
               Target Customers

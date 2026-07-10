@@ -12,7 +12,8 @@ import {
 import { useAnalysisStore } from "@/lib/store/analysisStore";
 
 export default function ScoreCard() {
-  const { analysis, loading } = useAnalysisStore();
+  const analysis = useAnalysisStore((state) => state.analysis);
+  const loading = useAnalysisStore((state) => state.loading);
 
   const cards = [
     {

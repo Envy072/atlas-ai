@@ -2,30 +2,23 @@
 
 import { AlertTriangle } from "lucide-react";
 import { useAnalysisStore } from "@/lib/store/analysisStore";
+import SectionHeader from "@/components/shared/SectionHeader";
+import IconBadge from "@/components/shared/IconBadge";
 
 export default function RisksCard() {
-  const { analysis } = useAnalysisStore();
+  const analysis = useAnalysisStore((state) => state.analysis);
 
   if (!analysis) return null;
 
   return (
     <section className="space-y-8">
 
-      <div>
-
-        <p className="text-sm font-semibold uppercase tracking-widest text-red-600">
-          Risk Assessment
-        </p>
-
-        <h2 className="mt-2 text-3xl font-bold">
-          Startup Risks
-        </h2>
-
-        <p className="mt-3 text-gray-500">
-          Atlas AI identified the primary risks associated with this startup.
-        </p>
-
-      </div>
+      <SectionHeader
+        eyebrow="Risk Assessment"
+        eyebrowClassName="text-red-600"
+        heading="Startup Risks"
+        description="Atlas AI identified the primary risks associated with this startup."
+      />
 
       <div className="space-y-5">
 
@@ -37,11 +30,12 @@ export default function RisksCard() {
 
             <div className="flex items-start gap-4">
 
-              <div className="rounded-2xl bg-red-100 p-3">
-
-                <AlertTriangle className="h-6 w-6 text-red-600" />
-
-              </div>
+              <IconBadge
+                icon={AlertTriangle}
+                size="md"
+                bgClassName="bg-red-100"
+                textClassName="text-red-600"
+              />
 
               <div>
 
