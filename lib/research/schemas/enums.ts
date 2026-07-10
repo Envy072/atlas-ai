@@ -35,6 +35,17 @@ export const SourceTypeSchema = z.enum([
 
 export type SourceType = z.infer<typeof SourceTypeSchema>;
 
-export const ProviderResultStatusSchema = z.enum(["ok", "error", "not_implemented"]);
+// "not_configured" is distinct from "not_implemented": the provider's
+// search() is real code (Milestone 5), but no API key/credential is
+// present in this environment. Conflating the two would be dishonest —
+// one means "this code doesn't exist yet," the other means "this code
+// exists and would run if configured."
+export const ProviderResultStatusSchema = z.enum([
+  "ok",
+  "error",
+  "timeout",
+  "not_implemented",
+  "not_configured",
+]);
 
 export type ProviderResultStatus = z.infer<typeof ProviderResultStatusSchema>;

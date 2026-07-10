@@ -1,34 +1,29 @@
 import { ResearchRequestSchema, type ResearchRequest } from "@/lib/research/schemas/researchRequest.schema";
 import { ResearchResultSchema, type ResearchResult } from "@/lib/research/schemas/researchResult.schema";
-import type { ProviderResult } from "@/lib/research/schemas/providerResult.schema";
-import type { ProviderId } from "@/lib/research/schemas/enums";
 import { parseOrThrow } from "@/lib/validation/parse";
-import { selectProviders } from "@/lib/research/orchestrator/providerSelector";
 import { dedupeSources } from "@/lib/research/utils/deduplication";
 import { rankSources } from "@/lib/research/ranking/rankingEngine";
-
-function buildErrorResult(providerId: ProviderId, topic: string, startedAt: number, error: unknown): ProviderResult {
-  return {
-    providerId,
-    query: topic,
-    status: "error",
-    sources: [],
-    fetchedAt: new Date().toISOString(),
-    tookMs: Date.now() - startedAt,
-    error: error instanceof Error ? error.message : "Unknown provider error.",
-  };
-}
+import { searchViaProviderManager } from "@/lib/research/manager/providerManager";
+import { buildEvidence } from "@/lib/research/evidence/evidenceBuilder";
+import {
+  buildProviderSummary,
+  buildSourceSummary,
+  buildSearchStatistics,
+} from "@/lib/research/orchestrator/resultSummarizer";
 
 // The single entry point this whole module exists to provide: take a
-// research request, fan it out to every selected provider in parallel,
-// and come back with one unified, ranked, deduplicated result — fully
-// functional today even though every provider currently returns zero
-// real sources (see providers/*). Nothing here changes once providers
-// become real; only their own `search()` bodies do.
+// research request and come back with one unified, ranked, deduplicated,
+// evidence-backed result.
 //
-// Not called by anything yet (lib/analysis/, lib/services/, and app/api/
-// are frozen this milestone) — this is standalone infrastructure, wired
-// in during a future milestone.
+// Milestone 5 change: this no longer calls providers directly (Step 1's
+// core rule — "The Orchestrator must communicate with ProviderManager,
+// not directly with providers"). ProviderManager owns provider selection,
+// fallback, retry, timeout, and health/metrics tracking; this function's
+// job is purely to take ProviderManager's output and turn it into a
+// ResearchResult — merge, dedupe, rank, build evidence, summarize.
+//
+// Not called by anything outside lib/research/ yet — see
+// RESEARCH_ENGINE.md / PROVIDER_MANAGER.md's Future Integration Plan.
 export async function runResearch(request: ResearchRequest): Promise<ResearchResult> {
   const validatedRequest = parseOrThrow(
     ResearchRequestSchema,
@@ -36,33 +31,45 @@ export async function runResearch(request: ResearchRequest): Promise<ResearchRes
     "Invalid research request."
   );
 
-  const providers = selectProviders(validatedRequest.providers);
+  const requestStartedAt = Date.now();
 
-  const providerResults = await Promise.all(
-    providers.map(async (provider) => {
-      const startedAt = Date.now();
-
-      try {
-        return await provider.search({
-          topic: validatedRequest.topic,
-          maxResults: validatedRequest.maxResultsPerProvider,
-          freshnessWindowDays: validatedRequest.freshnessWindowDays,
-        });
-      } catch (error) {
-        return buildErrorResult(provider.id, validatedRequest.topic, startedAt, error);
-      }
-    })
+  const outcomes = await searchViaProviderManager(
+    {
+      topic: validatedRequest.topic,
+      maxResults: validatedRequest.maxResultsPerProvider,
+      freshnessWindowDays: validatedRequest.freshnessWindowDays,
+    },
+    { providerIds: validatedRequest.providers }
   );
 
+  const providerResults = outcomes.map((outcome) => outcome.result);
   const mergedSources = providerResults.flatMap((result) => result.sources);
   const dedupedSources = dedupeSources(mergedSources);
   const rankedSources = rankSources(dedupedSources, { topic: validatedRequest.topic });
 
+  // Step 7: populate the real Evidence model from real provider data. The
+  // "claim" is the source's own title (a research-stage claim — "this
+  // source exists and says X") until a future pipeline stage builds a
+  // more specific claim from it; the confidence is the source's own
+  // (Tavily's real relevance score, or Brave's documented position-based
+  // heuristic — see each provider's own comments), never fabricated here.
+  const evidence = rankedSources.map((source) =>
+    buildEvidence({
+      claim: source.title,
+      evidence: source.snippet ?? source.title,
+      confidence: source.confidence,
+      source,
+    })
+  );
+
   const result: ResearchResult = {
     request: validatedRequest,
     sources: rankedSources,
-    evidence: [],
+    evidence,
     providerResults,
+    providerSummary: buildProviderSummary(outcomes),
+    sourceSummary: buildSourceSummary(rankedSources),
+    searchStatistics: buildSearchStatistics(outcomes, Date.now() - requestStartedAt),
     generatedAt: new Date().toISOString(),
   };
 
