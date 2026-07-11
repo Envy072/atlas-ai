@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,8 +35,18 @@ export default function RootLayout({
             .dark class this toggles is the same one globals.css already
             defines tokens for. suppressHydrationWarning on <html> above
             is required since this script edits the DOM before React
-            hydrates. */}
-        <script
+            hydrates.
+            Uses next/script's beforeInteractive strategy rather than a
+            raw <script> tag — a plain JSX <script> isn't managed by
+            Next.js's script pipeline, so React can end up recreating it
+            via the DOM API on reconciliation, and script elements built
+            that way are not guaranteed to execute. beforeInteractive is
+            the strategy Next.js documents for exactly this "run before
+            hydration" use case, and it's only valid in the root layout,
+            which this is. */}
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem("atlas-ai-theme");var isDark=t?t==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;if(isDark)document.documentElement.classList.add("dark")}catch(e){}})()`,
           }}

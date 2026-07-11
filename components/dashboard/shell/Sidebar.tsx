@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -32,9 +32,37 @@ const NAV_ITEMS = [
 
 const COLLAPSE_STORAGE_KEY = "atlas-ai-sidebar-collapsed";
 
+// A tiny external store over localStorage, read via useSyncExternalStore
+// below. This is what actually fixes the hydration mismatch: the server
+// has no localStorage, so it can only ever render the collapsed state as
+// `getServerSnapshot` says (false). React guarantees the client's first
+// render — the one hydration diffs against — uses that same server
+// snapshot rather than the real stored value, so hydration never sees a
+// mismatch; the real value (and any later change, via the toggle button
+// below) is picked up in a subsequent, ordinary re-render. The previous
+// code read localStorage directly inside a useState lazy initializer,
+// which runs during the client's very first render — exactly the render
+// hydration compares against — so a returning visitor with "true" stored
+// produced different markup (width, collapsed styling, the Logo-vs-"A"
+// swap) than the server had rendered.
+const collapseListeners = new Set<() => void>();
+
 function getStoredCollapsed(): boolean {
-  if (typeof window === "undefined") return false;
   return window.localStorage.getItem(COLLAPSE_STORAGE_KEY) === "true";
+}
+
+function getServerCollapsedSnapshot(): boolean {
+  return false;
+}
+
+function setStoredCollapsed(value: boolean): void {
+  window.localStorage.setItem(COLLAPSE_STORAGE_KEY, String(value));
+  collapseListeners.forEach((listener) => listener());
+}
+
+function subscribeToCollapsed(listener: () => void): () => void {
+  collapseListeners.add(listener);
+  return () => collapseListeners.delete(listener);
 }
 
 interface SidebarNavListProps {
@@ -92,14 +120,14 @@ interface SidebarProps {
 
 export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(getStoredCollapsed);
+  const collapsed = useSyncExternalStore(
+    subscribeToCollapsed,
+    getStoredCollapsed,
+    getServerCollapsedSnapshot
+  );
 
   function toggleCollapsed() {
-    setCollapsed((prev) => {
-      const next = !prev;
-      window.localStorage.setItem(COLLAPSE_STORAGE_KEY, String(next));
-      return next;
-    });
+    setStoredCollapsed(!collapsed);
   }
 
   return (
