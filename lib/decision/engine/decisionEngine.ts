@@ -127,6 +127,17 @@ export async function synthesizeDecision(
     // Decision never estimates, forecasts, or scores a financial profile
     // itself — this is lib/financial's own, unmodified single-run output.
     financialProfile: financialDiscovery.profile,
+    // Milestone 19: passed through directly from discoverBusiness() —
+    // same identity blocker as financialProfile above, so no
+    // resolveBusinessKnowledge()-style call here either
+    // (MILESTONE_19_DESIGN.md Section 7). Additive only: businessSummary
+    // and strengths/weaknesses/opportunities/threats above are NOT
+    // recomputed from this — both remain the exact same hand-picked
+    // projection of businessDiscovery.profile they already were before
+    // this milestone. businessProfile is the same object, exposed in
+    // full alongside that existing projection, not a replacement for it
+    // (MILESTONE_19_DESIGN.md Section 11).
+    businessProfile: businessDiscovery.profile,
     sources: aggregated.sources,
     evidence: aggregated.evidence,
   });

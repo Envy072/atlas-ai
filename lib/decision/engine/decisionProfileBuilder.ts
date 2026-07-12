@@ -2,6 +2,7 @@ import type { Source, Evidence } from "@/lib/research";
 import type { CompanyProfile } from "@/lib/competitors";
 import type { MarketProfile } from "@/lib/market";
 import type { FinancialProfile } from "@/lib/financial";
+import type { BusinessProfile } from "@/lib/business";
 import type { DecisionProfile } from "@/lib/decision/schemas/decision.schema";
 import { DecisionProfileSchema } from "@/lib/decision/schemas/decision.schema";
 import type { DecisionContext } from "@/lib/decision/schemas/context.schema";
@@ -71,6 +72,15 @@ export interface BuildDecisionProfileInput {
   // merged, or persisted here (MILESTONE_18_DESIGN.md Section 6: no
   // natural cross-analysis identity exists for FinancialProfile yet).
   financialProfile: FinancialProfile;
+  // Milestone 19, additive, required (not optional) — discoverBusiness()
+  // always produces a BusinessProfile. Reused verbatim, passed through
+  // directly from lib/business.discoverBusiness() — never resolved,
+  // merged, or persisted here (MILESTONE_19_DESIGN.md Section 7: same
+  // identity blocker as FinancialProfile). `businessSummary` above stays
+  // the pre-existing, hand-picked projection of this same profile — this
+  // function does not derive one from the other (MILESTONE_19_DESIGN.md
+  // Section 11).
+  businessProfile: BusinessProfile;
   sources?: Source[];
   evidence?: Evidence[];
   now?: Date;
@@ -130,6 +140,7 @@ export function buildDecisionProfile(input: BuildDecisionProfileInput): Decision
       keyCompetitors,
       marketProfile: input.marketProfile,
       financialProfile: input.financialProfile,
+      businessProfile: input.businessProfile,
       sources,
       evidence,
       confidenceSummary,

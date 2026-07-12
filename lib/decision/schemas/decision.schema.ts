@@ -3,6 +3,7 @@ import { SourceSchema, EvidenceSchema } from "@/lib/research";
 import { RefreshMetadataSchema, CompanyProfileSchema } from "@/lib/competitors";
 import { MarketProfileSchema } from "@/lib/market";
 import { FinancialProfileSchema } from "@/lib/financial";
+import { BusinessProfileSchema } from "@/lib/business";
 import { DecisionContextSchema } from "@/lib/decision/schemas/context.schema";
 import { BusinessSummarySchema } from "@/lib/decision/schemas/businessSummary.schema";
 import { InvestmentThesisSchema } from "@/lib/decision/schemas/thesis.schema";
@@ -38,7 +39,15 @@ import { DecisionReadinessSchema } from "@/lib/decision/schemas/readiness.schema
 // deliberately NOT resolved/accumulated the way keyCompetitors/
 // marketProfile are, since FinancialProfile has no natural
 // cross-analysis identity to accumulate against yet
-// (MILESTONE_18_DESIGN.md Section 6).
+// (MILESTONE_18_DESIGN.md Section 6). `businessProfile` (Milestone 19,
+// additive) reuses lib/business's own BusinessProfileSchema verbatim,
+// passed through directly from discoverBusiness() — the same identity
+// blocker as FinancialProfile applies (MILESTONE_19_DESIGN.md Section
+// 7), so this is likewise unresolved/unaccumulated. `businessSummary`
+// and the top-level strengths/weaknesses/opportunities/threats fields
+// below remain the pre-existing, curated projection of the same
+// BusinessProfile that DecisionSummaryPanel already renders — NOT a
+// second, competing source of truth (MILESTONE_19_DESIGN.md Section 11).
 export const DecisionProfileSchema = z.object({
   id: z.string(),
   decisionContext: DecisionContextSchema,
@@ -53,6 +62,7 @@ export const DecisionProfileSchema = z.object({
   keyCompetitors: z.array(CompanyProfileSchema),
   marketProfile: MarketProfileSchema,
   financialProfile: FinancialProfileSchema,
+  businessProfile: BusinessProfileSchema,
   sources: z.array(SourceSchema),
   evidence: z.array(EvidenceSchema),
   confidenceSummary: DecisionConfidenceSchema,
