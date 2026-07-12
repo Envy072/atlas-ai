@@ -1,4 +1,5 @@
 import type { Source, Evidence } from "@/lib/research";
+import type { CompanyProfile } from "@/lib/competitors";
 import type { DecisionProfile } from "@/lib/decision/schemas/decision.schema";
 import { DecisionProfileSchema } from "@/lib/decision/schemas/decision.schema";
 import type { DecisionContext } from "@/lib/decision/schemas/context.schema";
@@ -50,6 +51,11 @@ export interface BuildDecisionProfileInput {
   weaknesses?: string[];
   opportunities?: string[];
   threats?: string[];
+  // Milestone 16, additive — real, persisted CompanyProfile records
+  // resolved by lib/competitors.resolveCompetitorKnowledge(), reused
+  // verbatim (never recomputed here — see MILESTONE_16_DESIGN.md
+  // Section 9).
+  keyCompetitors?: CompanyProfile[];
   sources?: Source[];
   evidence?: Evidence[];
   now?: Date;
@@ -66,6 +72,7 @@ export function buildDecisionProfile(input: BuildDecisionProfileInput): Decision
   const now = input.now ?? new Date();
   const sources = input.sources ?? [];
   const evidence = input.evidence ?? [];
+  const keyCompetitors = input.keyCompetitors ?? [];
 
   const findings = deriveFindings();
   const criticalRisks = deriveCriticalRisks();
@@ -79,6 +86,7 @@ export function buildDecisionProfile(input: BuildDecisionProfileInput): Decision
     hasFindings: findings.length > 0,
     hasCriticalRisks: criticalRisks.length > 0,
     hasEvidence: evidence.length > 0,
+    hasCompetitorProfiles: keyCompetitors.length > 0,
   };
 
   const confidenceSummary = computeDecisionConfidence({ sources, evidence, checklist });
@@ -96,6 +104,7 @@ export function buildDecisionProfile(input: BuildDecisionProfileInput): Decision
       opportunities: input.opportunities ?? [],
       threats: input.threats ?? [],
       criticalRisks,
+      keyCompetitors,
       sources,
       evidence,
       confidenceSummary,

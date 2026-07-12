@@ -12,4 +12,9 @@ export interface CoverageChecklist {
   hasFindings: boolean;
   hasCriticalRisks: boolean;
   hasEvidence: boolean;
+  // Milestone 16, additive — real competitor knowledge (at least one
+  // resolved CompanyProfile) is now a distinct coverage signal, directly
+  // tying richer competitor intelligence to a measurable confidence
+  // change (MILESTONE_16_DESIGN.md Section 7).
+  hasCompetitorProfiles: boolean;
 }

@@ -1,5 +1,5 @@
 import { runResearch } from "@/lib/research";
-import { discoverCompetitors } from "@/lib/competitors";
+import { discoverCompetitors, resolveCompetitorKnowledge } from "@/lib/competitors";
 import { discoverMarket } from "@/lib/market";
 import { discoverFinancials } from "@/lib/financial";
 import { discoverBusiness } from "@/lib/business";
@@ -56,20 +56,29 @@ export async function synthesizeDecision(
       discoverBusiness({ startupIdea: request.startupIdea }),
     ]);
 
+  // Milestone 16: resolves this run's raw, unpersisted discovery
+  // candidates into real, identity-matched, accumulating CompanyProfile
+  // records — the "caller's job" COMPETITOR_PLATFORM.md always said
+  // discovery itself never does (MILESTONE_16_DESIGN.md). Decision never
+  // matches, builds, or merges a company itself — this is a single call
+  // into lib/competitors' own public barrel, exactly like every other
+  // platform Decision already consumes.
+  const keyCompetitors = await resolveCompetitorKnowledge(competitorDiscovery.candidates);
+
   const aggregated = aggregateEvidence(
     [
       researchResult.sources,
       marketDiscovery.profile.sources,
       financialDiscovery.profile.sources,
       businessDiscovery.profile.sources,
-      ...competitorDiscovery.candidates.map((candidate) => candidate.sources),
+      ...keyCompetitors.map((competitor) => competitor.sources),
     ],
     [
       researchResult.evidence,
       marketDiscovery.profile.evidence,
       financialDiscovery.profile.evidence,
       businessDiscovery.profile.evidence,
-      ...competitorDiscovery.candidates.map((candidate) => candidate.evidence),
+      ...keyCompetitors.map((competitor) => competitor.evidence),
     ]
   );
 
@@ -77,7 +86,12 @@ export async function synthesizeDecision(
     decisionContext: {
       startupIdea: request.startupIdea,
       marketIndustry: marketDiscovery.profile.industry,
-      competitorCount: competitorDiscovery.candidates.length,
+      // The resolved, deduplicated count — intra-run near-duplicates
+      // (e.g. "HubSpot" / "Hub Spot" grouped separately by discovery's
+      // own simpler heuristic) collapse to one company via the same
+      // matcher a cross-run duplicate would use, so this is a more
+      // honest count than the raw candidate list's own length.
+      competitorCount: keyCompetitors.length,
       fundingStage: financialDiscovery.profile.fundingStage,
     },
     businessSummary: {
@@ -91,6 +105,7 @@ export async function synthesizeDecision(
     weaknesses: businessDiscovery.profile.businessWeaknesses,
     opportunities: businessDiscovery.profile.businessOpportunities,
     threats: businessDiscovery.profile.businessThreats,
+    keyCompetitors,
     sources: aggregated.sources,
     evidence: aggregated.evidence,
   });

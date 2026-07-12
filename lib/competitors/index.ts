@@ -7,6 +7,7 @@
 // providers.
 export { buildCompanyProfile } from "@/lib/competitors/knowledge/companyProfileBuilder";
 export { mergeCompanyProfile } from "@/lib/competitors/knowledge/profileMerger";
+export { resolveCompetitorKnowledge } from "@/lib/competitors/knowledge/competitorResolver";
 
 export { discoverCompetitors } from "@/lib/competitors/discovery/competitorDiscovery";
 export { extractCandidateName } from "@/lib/competitors/discovery/candidateExtraction";

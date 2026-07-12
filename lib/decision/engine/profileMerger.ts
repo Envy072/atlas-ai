@@ -65,6 +65,11 @@ export function mergeDecisionProfile(
     hasFindings: keyFindings.length > 0,
     hasCriticalRisks: criticalRisks.length > 0,
     hasEvidence: evidence.length > 0,
+    // MergeDecisionProfileInput doesn't accept new competitors (Milestone
+    // 16 scoped keyCompetitors resolution to buildDecisionProfile() only
+    // — see MILESTONE_16_DESIGN.md's Definition of Done); reflects the
+    // existing profile's own count, unchanged by this merge.
+    hasCompetitorProfiles: existing.keyCompetitors.length > 0,
   };
   const confidenceSummary = computeDecisionConfidence({ sources, evidence, checklist });
 

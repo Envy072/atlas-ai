@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { SourceSchema, EvidenceSchema } from "@/lib/research";
-import { RefreshMetadataSchema } from "@/lib/competitors";
+import { RefreshMetadataSchema, CompanyProfileSchema } from "@/lib/competitors";
 import { DecisionContextSchema } from "@/lib/decision/schemas/context.schema";
 import { BusinessSummarySchema } from "@/lib/decision/schemas/businessSummary.schema";
 import { InvestmentThesisSchema } from "@/lib/decision/schemas/thesis.schema";
@@ -22,7 +22,11 @@ import { DecisionReadinessSchema } from "@/lib/decision/schemas/readiness.schema
 // Intelligence's job is to combine existing knowledge, not to re-derive
 // a business's SWOT a second time. `sources`/`evidence` reuse
 // lib/research's schemas; `refresh` reuses lib/competitors' — neither
-// redefined here.
+// redefined here. `keyCompetitors` (Milestone 16, additive) reuses
+// lib/competitors' own CompanyProfileSchema verbatim — real, persisted,
+// accumulating competitor records resolved by
+// lib/competitors.resolveCompetitorKnowledge(), never a parallel
+// "decision-local" competitor shape.
 export const DecisionProfileSchema = z.object({
   id: z.string(),
   decisionContext: DecisionContextSchema,
@@ -34,6 +38,7 @@ export const DecisionProfileSchema = z.object({
   opportunities: z.array(z.string()),
   threats: z.array(z.string()),
   criticalRisks: z.array(RiskFindingSchema),
+  keyCompetitors: z.array(CompanyProfileSchema),
   sources: z.array(SourceSchema),
   evidence: z.array(EvidenceSchema),
   confidenceSummary: DecisionConfidenceSchema,
