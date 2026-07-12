@@ -9,6 +9,18 @@ interface DecisionSummaryPanelProps {
   profile: DecisionProfile;
 }
 
+// A single, honest severity→tone mapping shared by both Finding's
+// three-level Severity and RiskFinding's four-level RedFlagSeverity
+// (MILESTONE_15_DESIGN.md's complexity review) — replaces the prior
+// inconsistency where every critical risk showed a blanket "destructive"
+// badge regardless of its actual severity, which misrepresented a "low"
+// risk as being as alarming as a "critical" one.
+function severityBadgeVariant(severity: string): "destructive" | "warning" | "secondary" {
+  if (severity === "critical" || severity === "high") return "destructive";
+  if (severity === "medium") return "warning";
+  return "secondary";
+}
+
 function StringList({ items, empty }: { items: string[]; empty: string }) {
   if (items.length === 0) {
     return <p className="text-sm text-muted-foreground">{empty}</p>;
@@ -96,7 +108,7 @@ export default function DecisionSummaryPanel({ profile }: DecisionSummaryPanelPr
             {keyFindings.map((finding) => (
               <li key={finding.id} className="flex flex-wrap items-center gap-2 text-sm">
                 <Badge variant="outline">{finding.category}</Badge>
-                <Badge variant="secondary">{finding.severity}</Badge>
+                <Badge variant={severityBadgeVariant(finding.severity)}>{finding.severity}</Badge>
                 <span className="text-foreground">{finding.summary}</span>
               </li>
             ))}
@@ -112,8 +124,8 @@ export default function DecisionSummaryPanel({ profile }: DecisionSummaryPanelPr
           <ul className="space-y-2">
             {criticalRisks.map((risk) => (
               <li key={risk.id} className="flex flex-wrap items-center gap-2 text-sm">
-                <Badge variant="destructive">{risk.severity}</Badge>
                 <Badge variant="outline">{risk.category}</Badge>
+                <Badge variant={severityBadgeVariant(risk.severity)}>{risk.severity}</Badge>
                 <span className="text-foreground">{risk.summary}</span>
               </li>
             ))}
