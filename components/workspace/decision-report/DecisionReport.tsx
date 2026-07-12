@@ -2,6 +2,7 @@ import type { DecisionProfile } from "@/lib/decision";
 import type { VerificationSummary } from "@/lib/verification";
 import DecisionSummaryPanel from "@/components/workspace/decision-report/DecisionSummaryPanel";
 import TrustPanel from "@/components/workspace/decision-report/TrustPanel";
+import CompetitorIntelligenceCard from "@/components/workspace/decision-report/CompetitorIntelligenceCard";
 
 interface DecisionReportProps {
   profile: DecisionProfile;
@@ -14,10 +15,14 @@ interface DecisionReportProps {
 // schema, which this milestone never touches. Trust renders before the
 // Decision summary (MILESTONE_15_DESIGN.md Sections 5/11): a founder
 // should see how much to trust a conclusion before reading it.
+// CompetitorIntelligenceCard (Milestone 20, additive) renders
+// profile.keyCompetitors directly — no new prop threading, no mapping
+// layer (MILESTONE_20_DESIGN.md Section 14).
 export default function DecisionReport({ profile, verification }: DecisionReportProps) {
   return (
     <div className="space-y-8">
       <TrustPanel verification={verification} />
+      <CompetitorIntelligenceCard competitors={profile.keyCompetitors} />
       <DecisionSummaryPanel profile={profile} />
     </div>
   );
