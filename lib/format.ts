@@ -9,6 +9,20 @@ export function formatPercent(value: number): string {
   return `${value}%`;
 }
 
+const compactUsdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+// Formats a raw USD figure ($1,200,000,000) as "$1.2B" — for market-size
+// and financial estimates, which are routinely too large to read as a
+// literal number.
+export function formatCurrencyUsd(valueUsd: number): string {
+  return compactUsdFormatter.format(valueUsd);
+}
+
 const RELATIVE_TIME_UNITS: Array<{ limit: number; divisor: number; unit: Intl.RelativeTimeFormatUnit }> = [
   { limit: 60, divisor: 1, unit: "second" },
   { limit: 3600, divisor: 60, unit: "minute" },
