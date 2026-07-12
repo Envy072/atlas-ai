@@ -1,5 +1,6 @@
 import type { Source, Evidence } from "@/lib/research";
 import type { CompanyProfile } from "@/lib/competitors";
+import type { MarketProfile } from "@/lib/market";
 import type { DecisionProfile } from "@/lib/decision/schemas/decision.schema";
 import { DecisionProfileSchema } from "@/lib/decision/schemas/decision.schema";
 import type { DecisionContext } from "@/lib/decision/schemas/context.schema";
@@ -56,6 +57,12 @@ export interface BuildDecisionProfileInput {
   // verbatim (never recomputed here — see MILESTONE_16_DESIGN.md
   // Section 9).
   keyCompetitors?: CompanyProfile[];
+  // Milestone 17, additive, required (not optional like keyCompetitors)
+  // — discoverMarket() always produces a MarketProfile, even for an
+  // "unclassified" industry, so a caller always has one to pass. Reused
+  // verbatim from lib/market.resolveMarketKnowledge() — never recomputed
+  // here (MILESTONE_17_DESIGN.md Section 14).
+  marketProfile: MarketProfile;
   sources?: Source[];
   evidence?: Evidence[];
   now?: Date;
@@ -81,12 +88,20 @@ export function buildDecisionProfile(input: BuildDecisionProfileInput): Decision
     hasBusinessModel: Boolean(input.businessSummary.businessModel),
     hasValueProposition: Boolean(input.businessSummary.valueProposition),
     hasCustomerProblem: Boolean(input.businessSummary.customerProblem),
-    hasMarketIndustry: Boolean(input.decisionContext.marketIndustry),
+    // Fixed, Milestone 17 ("## Design Deviation",
+    // MILESTONE_17_DESIGN.md): classifyIndustry() always returns a
+    // non-empty string ("unclassified" when nothing matches, never
+    // undefined), so a bare Boolean() check here was vacuously true on
+    // every DecisionProfile ever built — this now requires a real,
+    // non-"unclassified" classification to count as coverage.
+    hasMarketIndustry:
+      Boolean(input.decisionContext.marketIndustry) && input.decisionContext.marketIndustry !== "unclassified",
     hasFundingStage: Boolean(input.decisionContext.fundingStage),
     hasFindings: findings.length > 0,
     hasCriticalRisks: criticalRisks.length > 0,
     hasEvidence: evidence.length > 0,
     hasCompetitorProfiles: keyCompetitors.length > 0,
+    hasMarketProfile: input.marketProfile.industry !== "unclassified",
   };
 
   const confidenceSummary = computeDecisionConfidence({ sources, evidence, checklist });
@@ -105,6 +120,7 @@ export function buildDecisionProfile(input: BuildDecisionProfileInput): Decision
       threats: input.threats ?? [],
       criticalRisks,
       keyCompetitors,
+      marketProfile: input.marketProfile,
       sources,
       evidence,
       confidenceSummary,

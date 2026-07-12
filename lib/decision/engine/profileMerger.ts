@@ -60,7 +60,11 @@ export function mergeDecisionProfile(
     hasBusinessModel: Boolean(existing.businessSummary.businessModel),
     hasValueProposition: Boolean(existing.businessSummary.valueProposition),
     hasCustomerProblem: Boolean(existing.businessSummary.customerProblem),
-    hasMarketIndustry: Boolean(existing.decisionContext.marketIndustry),
+    // Same fix as decisionProfileBuilder.ts (Milestone 17, "## Design
+    // Deviation" in MILESTONE_17_DESIGN.md) — a bare Boolean() check is
+    // vacuously true, since classifyIndustry() never returns undefined.
+    hasMarketIndustry:
+      Boolean(existing.decisionContext.marketIndustry) && existing.decisionContext.marketIndustry !== "unclassified",
     hasFundingStage: Boolean(existing.decisionContext.fundingStage),
     hasFindings: keyFindings.length > 0,
     hasCriticalRisks: criticalRisks.length > 0,
@@ -70,6 +74,11 @@ export function mergeDecisionProfile(
     // — see MILESTONE_16_DESIGN.md's Definition of Done); reflects the
     // existing profile's own count, unchanged by this merge.
     hasCompetitorProfiles: existing.keyCompetitors.length > 0,
+    // Same reasoning as hasCompetitorProfiles — MergeDecisionProfileInput
+    // doesn't accept a new marketProfile (Milestone 17 scoped
+    // marketProfile resolution to buildDecisionProfile() only); reflects
+    // the existing profile's own state, unchanged by this merge.
+    hasMarketProfile: existing.marketProfile.industry !== "unclassified",
   };
   const confidenceSummary = computeDecisionConfidence({ sources, evidence, checklist });
 

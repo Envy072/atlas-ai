@@ -6,6 +6,7 @@
 // lib/research's public barrels enforce for themselves.
 export { buildMarketProfile } from "@/lib/market/knowledge/marketProfileBuilder";
 export { mergeMarketProfile } from "@/lib/market/knowledge/profileMerger";
+export { resolveMarketKnowledge } from "@/lib/market/knowledge/marketResolver";
 export { discoverMarket } from "@/lib/market/knowledge/marketDiscovery";
 
 export { classifyIndustry } from "@/lib/market/classification/industryClassifier";

@@ -1,6 +1,6 @@
 import { runResearch } from "@/lib/research";
 import { discoverCompetitors, resolveCompetitorKnowledge } from "@/lib/competitors";
-import { discoverMarket } from "@/lib/market";
+import { discoverMarket, resolveMarketKnowledge } from "@/lib/market";
 import { discoverFinancials } from "@/lib/financial";
 import { discoverBusiness } from "@/lib/business";
 import type {
@@ -65,17 +65,27 @@ export async function synthesizeDecision(
   // platform Decision already consumes.
   const keyCompetitors = await resolveCompetitorKnowledge(competitorDiscovery.candidates);
 
+  // Milestone 17: resolves this run's freshly-built, unpersisted
+  // MarketProfile into the accumulating knowledge base — the "caller's
+  // job" MARKET_PLATFORM.md always said discovery itself never does
+  // (MILESTONE_17_DESIGN.md). Only the durable-knowledge slice of
+  // MarketProfile accumulates (identity, durable facts, evidence) —
+  // sizing/growthRate/marketMaturity stay excluded from the merge
+  // contract, unchanged, per "## Knowledge vs Observation". Decision
+  // never classifies, sizes, or scores a market itself.
+  const marketProfile = await resolveMarketKnowledge(marketDiscovery.profile);
+
   const aggregated = aggregateEvidence(
     [
       researchResult.sources,
-      marketDiscovery.profile.sources,
+      marketProfile.sources,
       financialDiscovery.profile.sources,
       businessDiscovery.profile.sources,
       ...keyCompetitors.map((competitor) => competitor.sources),
     ],
     [
       researchResult.evidence,
-      marketDiscovery.profile.evidence,
+      marketProfile.evidence,
       financialDiscovery.profile.evidence,
       businessDiscovery.profile.evidence,
       ...keyCompetitors.map((competitor) => competitor.evidence),
@@ -85,7 +95,7 @@ export async function synthesizeDecision(
   const profile = buildDecisionProfile({
     decisionContext: {
       startupIdea: request.startupIdea,
-      marketIndustry: marketDiscovery.profile.industry,
+      marketIndustry: marketProfile.industry,
       // The resolved, deduplicated count — intra-run near-duplicates
       // (e.g. "HubSpot" / "Hub Spot" grouped separately by discovery's
       // own simpler heuristic) collapse to one company via the same
@@ -106,6 +116,7 @@ export async function synthesizeDecision(
     opportunities: businessDiscovery.profile.businessOpportunities,
     threats: businessDiscovery.profile.businessThreats,
     keyCompetitors,
+    marketProfile,
     sources: aggregated.sources,
     evidence: aggregated.evidence,
   });

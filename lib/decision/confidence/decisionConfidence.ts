@@ -5,11 +5,12 @@ import type { CoverageChecklist } from "@/lib/decision/types/confidence";
 import { parseOrThrow } from "@/lib/validation/parse";
 
 const MS_PER_DAY = 86_400_000;
-// Milestone 16, additive: CoverageChecklist gained hasCompetitorProfiles
-// (8 → 9 fields) — computeCoverage() itself needed no logic change, only
-// this constant, since it's already generic over the checklist's own
-// field count (Object.values(checklist).filter(Boolean).length).
-const CHECKLIST_SIZE = 9;
+// Milestone 16 added hasCompetitorProfiles (8 → 9); Milestone 17 adds
+// hasMarketProfile (9 → 10) — computeCoverage() itself needed no logic
+// change either time, only this constant, since it's already generic
+// over the checklist's own field count
+// (Object.values(checklist).filter(Boolean).length).
+const CHECKLIST_SIZE = 10;
 
 // Real, deterministic composition — every input here is a fact already
 // known (a field is present or it isn't; an evidence item has a real

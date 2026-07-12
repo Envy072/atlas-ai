@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SourceSchema, EvidenceSchema } from "@/lib/research";
 import { RefreshMetadataSchema, CompanyProfileSchema } from "@/lib/competitors";
+import { MarketProfileSchema } from "@/lib/market";
 import { DecisionContextSchema } from "@/lib/decision/schemas/context.schema";
 import { BusinessSummarySchema } from "@/lib/decision/schemas/businessSummary.schema";
 import { InvestmentThesisSchema } from "@/lib/decision/schemas/thesis.schema";
@@ -26,7 +27,11 @@ import { DecisionReadinessSchema } from "@/lib/decision/schemas/readiness.schema
 // lib/competitors' own CompanyProfileSchema verbatim — real, persisted,
 // accumulating competitor records resolved by
 // lib/competitors.resolveCompetitorKnowledge(), never a parallel
-// "decision-local" competitor shape.
+// "decision-local" competitor shape. `marketProfile` (Milestone 17,
+// additive) reuses lib/market's own MarketProfileSchema verbatim,
+// resolved by lib/market.resolveMarketKnowledge() — always present
+// (even for an "unclassified" industry), since a MarketProfile object
+// always exists once classification runs.
 export const DecisionProfileSchema = z.object({
   id: z.string(),
   decisionContext: DecisionContextSchema,
@@ -39,6 +44,7 @@ export const DecisionProfileSchema = z.object({
   threats: z.array(z.string()),
   criticalRisks: z.array(RiskFindingSchema),
   keyCompetitors: z.array(CompanyProfileSchema),
+  marketProfile: MarketProfileSchema,
   sources: z.array(SourceSchema),
   evidence: z.array(EvidenceSchema),
   confidenceSummary: DecisionConfidenceSchema,
