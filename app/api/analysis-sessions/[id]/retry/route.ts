@@ -1,0 +1,16 @@
+import { retryAnalysisSession } from "@/lib/services/analysisSessions";
+import { jsonSuccess, jsonError } from "@/lib/api/response";
+
+// Retries only the current failed stage, not the whole pipeline
+// (inherited unchanged from lib/pipeline via lib/analysis-session —
+// MILESTONE_14_DESIGN.md Section 7.4).
+export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const view = await retryAnalysisSession(id);
+
+    return jsonSuccess(view);
+  } catch (error) {
+    return jsonError(error);
+  }
+}

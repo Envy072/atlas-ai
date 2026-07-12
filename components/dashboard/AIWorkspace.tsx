@@ -2,43 +2,43 @@
 
 import { useState } from "react";
 import { Sparkles, AlertCircle } from "lucide-react";
-import { useAnalyzeStartup } from "@/hooks/useAnalyzeStartup";
+import { useAnalysisSession, isTerminalSessionState } from "@/hooks/useAnalysisSession";
 import type { ProjectRecord } from "@/lib/services/projects";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import EmptyState from "@/components/shared/EmptyState";
 import IdeaCommandCenter from "@/components/workspace/command-center/IdeaCommandCenter";
-import AIThinkingExperience from "@/components/workspace/thinking/AIThinkingExperience";
-import AnalysisReport from "@/components/workspace/report/AnalysisReport";
+import SessionProgressExperience from "@/components/workspace/session/SessionProgressExperience";
+import DecisionReport from "@/components/workspace/decision-report/DecisionReport";
 import ReportHistoryPanel from "@/components/workspace/history/ReportHistoryPanel";
 
 interface AIWorkspaceProps {
   projects: ProjectRecord[];
 }
 
-// The AI analysis experience: command center → thinking state → report,
-// with a real history panel alongside. The actual request lifecycle
-// (idea/loading/analysis/error, and the analyze() call itself) is
-// unchanged from before this milestone — only how each state is
-// presented changed.
+// The AI analysis experience: command center → live session progress →
+// decision report, with a real history panel alongside. Milestone 14
+// replaced the legacy single-call useAnalyzeStartup flow with
+// useAnalysisSession, wired to the real Pipeline/Analysis Session/
+// Verification backend (MILESTONE_14_DESIGN.md) — only the data source
+// and the report/loading components changed; this component's own
+// composition role (input → loading/progress → result, history beside
+// it) is unchanged.
 export default function AIWorkspace({ projects }: AIWorkspaceProps) {
   const [idea, setIdea] = useState("");
-  const { analyze, loading, analysis, error } = useAnalyzeStartup();
+  const { view, status, error, start, cancel, retry } = useAnalysisSession();
 
   async function analyzeIdea() {
-    await analyze(idea);
+    await start(idea);
   }
+
+  const isBusy = status === "starting" || (view !== null && !isTerminalSessionState(view.session.state));
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
       <div className="min-w-0 space-y-8">
         <Card className="p-8">
-          <IdeaCommandCenter
-            idea={idea}
-            onIdeaChange={setIdea}
-            onSubmit={analyzeIdea}
-            loading={loading}
-          />
+          <IdeaCommandCenter idea={idea} onIdeaChange={setIdea} onSubmit={analyzeIdea} loading={isBusy} />
         </Card>
 
         {error && (
@@ -48,9 +48,7 @@ export default function AIWorkspace({ projects }: AIWorkspaceProps) {
           </Alert>
         )}
 
-        {loading && <AIThinkingExperience />}
-
-        {!loading && !analysis && (
+        {!view && (
           <Card>
             <EmptyState
               icon={Sparkles}
@@ -60,7 +58,13 @@ export default function AIWorkspace({ projects }: AIWorkspaceProps) {
           </Card>
         )}
 
-        {!loading && analysis && <AnalysisReport analysis={analysis} />}
+        {view && view.session.state !== "completed" && (
+          <SessionProgressExperience session={view.session} onCancel={cancel} onRetry={retry} />
+        )}
+
+        {view && view.session.state === "completed" && view.session.result && view.verification && (
+          <DecisionReport profile={view.session.result.profile} verification={view.verification} />
+        )}
       </div>
 
       <aside className="xl:sticky xl:top-6 xl:h-fit">
