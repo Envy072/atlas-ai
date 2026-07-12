@@ -1,6 +1,7 @@
 import type { Source, Evidence } from "@/lib/research";
 import type { CompanyProfile } from "@/lib/competitors";
 import type { MarketProfile } from "@/lib/market";
+import type { FinancialProfile } from "@/lib/financial";
 import type { DecisionProfile } from "@/lib/decision/schemas/decision.schema";
 import { DecisionProfileSchema } from "@/lib/decision/schemas/decision.schema";
 import type { DecisionContext } from "@/lib/decision/schemas/context.schema";
@@ -63,6 +64,13 @@ export interface BuildDecisionProfileInput {
   // verbatim from lib/market.resolveMarketKnowledge() — never recomputed
   // here (MILESTONE_17_DESIGN.md Section 14).
   marketProfile: MarketProfile;
+  // Milestone 18, additive, required (not optional) — discoverFinancials()
+  // always produces a FinancialProfile, even when every FinancialEstimate
+  // field is honestly value-absent. Reused verbatim, passed through
+  // directly from lib/financial.discoverFinancials() — never resolved,
+  // merged, or persisted here (MILESTONE_18_DESIGN.md Section 6: no
+  // natural cross-analysis identity exists for FinancialProfile yet).
+  financialProfile: FinancialProfile;
   sources?: Source[];
   evidence?: Evidence[];
   now?: Date;
@@ -121,6 +129,7 @@ export function buildDecisionProfile(input: BuildDecisionProfileInput): Decision
       criticalRisks,
       keyCompetitors,
       marketProfile: input.marketProfile,
+      financialProfile: input.financialProfile,
       sources,
       evidence,
       confidenceSummary,

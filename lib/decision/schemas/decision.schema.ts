@@ -2,6 +2,7 @@ import { z } from "zod";
 import { SourceSchema, EvidenceSchema } from "@/lib/research";
 import { RefreshMetadataSchema, CompanyProfileSchema } from "@/lib/competitors";
 import { MarketProfileSchema } from "@/lib/market";
+import { FinancialProfileSchema } from "@/lib/financial";
 import { DecisionContextSchema } from "@/lib/decision/schemas/context.schema";
 import { BusinessSummarySchema } from "@/lib/decision/schemas/businessSummary.schema";
 import { InvestmentThesisSchema } from "@/lib/decision/schemas/thesis.schema";
@@ -31,7 +32,13 @@ import { DecisionReadinessSchema } from "@/lib/decision/schemas/readiness.schema
 // additive) reuses lib/market's own MarketProfileSchema verbatim,
 // resolved by lib/market.resolveMarketKnowledge() — always present
 // (even for an "unclassified" industry), since a MarketProfile object
-// always exists once classification runs.
+// always exists once classification runs. `financialProfile` (Milestone
+// 18, additive) reuses lib/financial's own FinancialProfileSchema
+// verbatim, passed through directly from discoverFinancials() —
+// deliberately NOT resolved/accumulated the way keyCompetitors/
+// marketProfile are, since FinancialProfile has no natural
+// cross-analysis identity to accumulate against yet
+// (MILESTONE_18_DESIGN.md Section 6).
 export const DecisionProfileSchema = z.object({
   id: z.string(),
   decisionContext: DecisionContextSchema,
@@ -45,6 +52,7 @@ export const DecisionProfileSchema = z.object({
   criticalRisks: z.array(RiskFindingSchema),
   keyCompetitors: z.array(CompanyProfileSchema),
   marketProfile: MarketProfileSchema,
+  financialProfile: FinancialProfileSchema,
   sources: z.array(SourceSchema),
   evidence: z.array(EvidenceSchema),
   confidenceSummary: DecisionConfidenceSchema,

@@ -117,6 +117,16 @@ export async function synthesizeDecision(
     threats: businessDiscovery.profile.businessThreats,
     keyCompetitors,
     marketProfile,
+    // Milestone 18: passed through directly from discoverFinancials() —
+    // deliberately no resolveFinancialKnowledge()-style call here, unlike
+    // keyCompetitors/marketProfile above. FinancialProfile has no natural
+    // cross-analysis identity to resolve against yet (no equivalent of a
+    // company name or a fixed industry category), and the honest identity
+    // key — a real authenticated user's project — requires Authentication
+    // (still unbuilt) to exist first (MILESTONE_18_DESIGN.md Section 6).
+    // Decision never estimates, forecasts, or scores a financial profile
+    // itself — this is lib/financial's own, unmodified single-run output.
+    financialProfile: financialDiscovery.profile,
     sources: aggregated.sources,
     evidence: aggregated.evidence,
   });
