@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Sparkles, AlertCircle } from "lucide-react";
 import { useAnalysisSession, isTerminalSessionState } from "@/hooks/useAnalysisSession";
-import type { ProjectRecord } from "@/lib/services/projects";
+import type { Project } from "@/lib/schemas/project";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import EmptyState from "@/components/shared/EmptyState";
@@ -13,7 +13,7 @@ import DecisionReport from "@/components/workspace/decision-report/DecisionRepor
 import ReportHistoryPanel from "@/components/workspace/history/ReportHistoryPanel";
 
 interface AIWorkspaceProps {
-  projects: ProjectRecord[];
+  projects: Project[];
 }
 
 // The AI analysis experience: command center → live session progress →

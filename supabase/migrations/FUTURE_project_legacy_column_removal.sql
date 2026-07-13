@@ -1,0 +1,47 @@
+-- Milestone 26 follow-up (NOT Milestone 26 itself) — Migration B.
+--
+-- STATUS: NOT APPROVED FOR EXECUTION. Deliberately excluded from the
+-- supabase/migrations/ numbered sequence (no timestamp prefix) so no
+-- migration tool applies it automatically. Do not run this until a
+-- human has made an explicit product decision about the 16 pre-existing
+-- legacy rows discovered during Milestone 26's runtime verification.
+--
+-- Context: the live `projects` table predates this milestone's schema
+-- and holds at least 16 rows shaped like the old, already-deleted
+-- AnalysisResult schema (columns: score, summary, problem, solution).
+-- Migration A (20260713203553_project_persistence.sql) deliberately
+-- left these four columns untouched — they are dead weight to this
+-- milestone's code (never read by lib/services/projects.ts) but their
+-- content is not this milestone's to destroy unilaterally.
+--
+-- Before running any version of this migration, decide:
+--   1. Export/archive the 16 legacy rows' current score/summary/
+--      problem/solution values somewhere durable, if they have any
+--      retained value, OR confirm they don't.
+--   2. Decide whether the 16 legacy rows themselves should be deleted
+--      outright (they can never satisfy this milestone's ProjectSchema
+--      — profile/verification have no honest backfill path from four
+--      legacy scalar fields, per the schema-compatibility review) or
+--      left in place as permanently-unreachable historical rows.
+--   3. Only then decide whether to actually drop the four columns, or
+--      leave them as documented, harmless dead columns indefinitely
+--      (this codebase already has precedent for tracking this kind of
+--      debt explicitly rather than force-cleaning it on a deadline).
+--
+-- Once that decision is made, the drop (if chosen) is:
+--
+-- alter table public.projects
+--   drop column if exists score,
+--   drop column if exists summary,
+--   drop column if exists problem,
+--   drop column if exists solution;
+--
+-- And only once every row genuinely has session_id/execution_id/
+-- profile/verification populated (i.e. the 16 legacy rows have been
+-- resolved one way or another, not left as NULL-holding orphans):
+--
+-- alter table public.projects
+--   alter column session_id set not null,
+--   alter column execution_id set not null,
+--   alter column profile set not null,
+--   alter column verification set not null;

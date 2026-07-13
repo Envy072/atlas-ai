@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { FolderKanban, Sparkles } from "lucide-react";
-import type { ProjectRecord } from "@/lib/services/projects";
-import { formatRelativeTime } from "@/lib/format";
+import type { Project } from "@/lib/schemas/project";
+import { formatRelativeTime, formatPercent } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import EmptyState from "@/components/shared/EmptyState";
 
 interface RecentProjectsPanelProps {
-  projects: ProjectRecord[];
+  projects: Project[];
 }
 
 const MAX_VISIBLE = 5;
@@ -45,30 +45,32 @@ export default function RecentProjectsPanel({ projects }: RecentProjectsPanelPro
             }
           />
         ) : (
-          recent.map((project) => (
-            <div
-              key={project.id}
-              className="flex items-center justify-between gap-4 p-5 transition-colors duration-150 hover:bg-muted/40"
-            >
-              <div className="min-w-0">
-                <p className="truncate font-semibold text-card-foreground">
-                  {project.title ?? "Untitled idea"}
-                </p>
-                <p className="mt-1 truncate text-sm text-muted-foreground">
-                  {project.summary ?? "No summary available."}
-                </p>
-              </div>
+          recent.map((project) => {
+            const { businessSummary, confidenceSummary } = project.profile;
 
-              <div className="flex shrink-0 flex-col items-end">
-                <span className="text-2xl font-bold text-primary">
-                  {project.score ?? "--"}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {formatRelativeTime(project.created_at)}
-                </span>
+            return (
+              <div
+                key={project.id}
+                className="flex items-center justify-between gap-4 p-5 transition-colors duration-150 hover:bg-muted/40"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-card-foreground">{project.title}</p>
+                  <p className="mt-1 truncate text-sm text-muted-foreground">
+                    {businessSummary.valueProposition ?? businessSummary.businessModel ?? "No summary available."}
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 flex-col items-end">
+                  <span className="text-2xl font-bold text-primary">
+                    {formatPercent(Math.round(confidenceSummary.evidenceConfidence))}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatRelativeTime(project.createdAt)}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </Card>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Activity, Sparkles } from "lucide-react";
-import type { ProjectRecord } from "@/lib/services/projects";
+import type { Project } from "@/lib/schemas/project";
 import { formatRelativeTime } from "@/lib/format";
 import IconBadge from "@/components/shared/IconBadge";
 import { Card } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import EmptyState from "@/components/shared/EmptyState";
 
 interface RecentActivityPanelProps {
-  projects: ProjectRecord[];
+  projects: Project[];
 }
 
 const MAX_VISIBLE = 5;
@@ -52,12 +52,9 @@ export default function RecentActivityPanel({ projects }: RecentActivityPanelPro
 
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-card-foreground">
-                  Analysis completed for{" "}
-                  <span className="font-semibold">{project.title ?? "an idea"}</span>
+                  Analysis completed for <span className="font-semibold">{project.title}</span>
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {formatRelativeTime(project.created_at)}
-                </p>
+                <p className="text-xs text-muted-foreground">{formatRelativeTime(project.createdAt)}</p>
               </div>
             </div>
           ))

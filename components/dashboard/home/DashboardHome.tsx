@@ -1,11 +1,11 @@
-import type { ProjectRecord } from "@/lib/services/projects";
+import type { Project } from "@/lib/schemas/project";
 import DashboardWelcome from "@/components/dashboard/home/DashboardWelcome";
 import DashboardStats from "@/components/dashboard/home/DashboardStats";
 import RecentProjectsPanel from "@/components/dashboard/home/RecentProjectsPanel";
 import RecentActivityPanel from "@/components/dashboard/home/RecentActivityPanel";
 
 interface DashboardHomeProps {
-  projects: ProjectRecord[];
+  projects: Project[];
 }
 
 // Composes the Dashboard Home page. Takes already-fetched project data as

@@ -1,29 +1,32 @@
 "use client";
 
 import { FolderKanban, TrendingUp, Trophy, CalendarClock } from "lucide-react";
-import type { ProjectRecord } from "@/lib/services/projects";
+import type { Project } from "@/lib/schemas/project";
+import { formatPercent } from "@/lib/format";
 import IconBadge from "@/components/shared/IconBadge";
 import { Card } from "@/components/ui/card";
 
 interface DashboardStatsProps {
-  projects: ProjectRecord[];
+  projects: Project[];
 }
 
 const WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
 
-function toScores(projects: ProjectRecord[]): number[] {
-  return projects
-    .map((project) => project.score)
-    .filter((score): score is number => typeof score === "number");
+// "Confidence," not "Score": DecisionProfile never produces a business-
+// quality verdict (MILESTONE_26_DESIGN.md Section 6) —
+// confidenceSummary.evidenceConfidence is a real but distinct
+// data-quality figure, and labeling it "Score" would misrepresent it.
+function toConfidenceScores(projects: Project[]): number[] {
+  return projects.map((project) => project.profile.confidenceSummary.evidenceConfidence);
 }
 
 // Kept outside the component so the (impure) Date.now() read isn't a
 // direct call inside a component's render body.
-function countProjectsThisWeek(projects: ProjectRecord[]): number {
+function countProjectsThisWeek(projects: Project[]): number {
   const now = Date.now();
 
   return projects.filter((project) => {
-    const createdAt = Date.parse(project.created_at);
+    const createdAt = Date.parse(project.createdAt);
     return !Number.isNaN(createdAt) && now - createdAt <= WEEK_IN_MS;
   }).length;
 }
@@ -32,10 +35,12 @@ function countProjectsThisWeek(projects: ProjectRecord[]): number {
 // fabricated numbers. Each falls back to "--" when there isn't enough data
 // yet rather than showing a misleading 0.
 export default function DashboardStats({ projects }: DashboardStatsProps) {
-  const scores = toScores(projects);
-  const averageScore =
-    scores.length > 0 ? Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length) : null;
-  const highestScore = scores.length > 0 ? Math.max(...scores) : null;
+  const confidenceScores = toConfidenceScores(projects);
+  const averageConfidence =
+    confidenceScores.length > 0
+      ? Math.round(confidenceScores.reduce((sum, s) => sum + s, 0) / confidenceScores.length)
+      : null;
+  const highestConfidence = confidenceScores.length > 0 ? Math.round(Math.max(...confidenceScores)) : null;
   const projectsThisWeek = countProjectsThisWeek(projects);
 
   const stats = [
@@ -47,15 +52,15 @@ export default function DashboardStats({ projects }: DashboardStatsProps) {
       textClassName: "text-primary",
     },
     {
-      title: "Average Score",
-      value: averageScore !== null ? String(averageScore) : "--",
+      title: "Average Confidence",
+      value: averageConfidence !== null ? formatPercent(averageConfidence) : "--",
       icon: TrendingUp,
       bgClassName: "bg-success/10",
       textClassName: "text-success",
     },
     {
-      title: "Highest Score",
-      value: highestScore !== null ? String(highestScore) : "--",
+      title: "Highest Confidence",
+      value: highestConfidence !== null ? formatPercent(highestConfidence) : "--",
       icon: Trophy,
       bgClassName: "bg-info/10",
       textClassName: "text-info",

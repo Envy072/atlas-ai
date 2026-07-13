@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { FolderClock, FileSearch } from "lucide-react";
-import type { ProjectRecord } from "@/lib/services/projects";
-import { formatRelativeTime } from "@/lib/format";
+import type { Project } from "@/lib/schemas/project";
+import { formatRelativeTime, formatPercent } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import EmptyState from "@/components/shared/EmptyState";
 
 interface ReportHistoryPanelProps {
-  projects: ProjectRecord[];
+  projects: Project[];
 }
 
 const MAX_VISIBLE = 8;
@@ -62,12 +62,10 @@ export default function ReportHistoryPanel({ projects }: ReportHistoryPanelProps
                       isSelected ? "bg-muted/60" : ""
                     }`}
                   >
-                    <p className="truncate text-sm font-medium text-card-foreground">
-                      {project.title ?? "Untitled idea"}
-                    </p>
+                    <p className="truncate text-sm font-medium text-card-foreground">{project.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatRelativeTime(project.created_at)}
-                      {typeof project.score === "number" && ` • Score ${project.score}`}
+                      {formatRelativeTime(project.createdAt)} •{" "}
+                      {formatPercent(Math.round(project.profile.confidenceSummary.evidenceConfidence))} confidence
                     </p>
                   </button>
                 </li>
