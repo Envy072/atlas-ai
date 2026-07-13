@@ -3,6 +3,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import SectionHeader from "@/components/shared/SectionHeader";
 import IconBadge from "@/components/shared/IconBadge";
+import StatCell from "@/components/shared/StatCell";
+import TagList from "@/components/shared/TagList";
+import EvidenceList from "@/components/shared/EvidenceList";
+import { severityBadgeVariant } from "@/components/shared/severityTone";
 import { formatPercent } from "@/lib/format";
 import type {
   BusinessProfile,
@@ -10,7 +14,6 @@ import type {
   MoatType,
   ExecutionComplexityLevel,
 } from "@/lib/business";
-import type { Severity } from "@/lib/market";
 
 interface BusinessIntelligenceCardProps {
   business: BusinessProfile;
@@ -39,24 +42,6 @@ const COMPLEXITY_LABEL: Record<ExecutionComplexityLevel, string> = {
   very_high: "Very high",
 };
 
-const SEVERITY_TONE: Record<Severity, "secondary" | "warning" | "destructive"> = {
-  low: "secondary",
-  medium: "warning",
-  high: "destructive",
-};
-
-function StringBadgeList({ items }: { items: string[] }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {items.map((item, index) => (
-        <Badge key={index} variant="outline">
-          {item}
-        </Badge>
-      ))}
-    </div>
-  );
-}
-
 // Renders every field BusinessProfile already carries — no field is
 // renamed, recomputed, or restructured; each value below reads directly
 // off the same object Milestone 19's discoverBusiness() already
@@ -77,7 +62,6 @@ export default function BusinessIntelligenceCard({ business }: BusinessIntellige
   const hasCompetitiveAdvantages = business.competitiveAdvantages.length > 0;
   const hasDependencies = business.keyDependencies.length > 0;
   const hasOperationalRisks = business.operationalRisks.length > 0;
-  const hasEvidence = business.evidence.length > 0;
 
   return (
     <Card className="space-y-6 p-7">
@@ -90,10 +74,7 @@ export default function BusinessIntelligenceCard({ business }: BusinessIntellige
             description={business.businessModel ?? business.valueProposition ?? "Business model not yet identified."}
           />
         </div>
-        <div className="text-right">
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Confidence</p>
-          <p className="mt-1 text-xl font-bold text-foreground">{formatPercent(Math.round(business.confidence))}</p>
-        </div>
+        <StatCell label="Confidence" value={formatPercent(Math.round(business.confidence))} className="text-right" />
       </div>
 
       {business.customerProblem && (
@@ -101,39 +82,26 @@ export default function BusinessIntelligenceCard({ business }: BusinessIntellige
       )}
 
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-        <div>
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Overall health</p>
-          <p className="mt-1 text-xl font-bold text-foreground">
-            {business.overallHealth.rating ? HEALTH_LABEL[business.overallHealth.rating] : "Not yet assessed"}
-          </p>
-          {business.overallHealth.rationale && (
-            <p className="mt-1 text-xs text-muted-foreground">{business.overallHealth.rationale}</p>
-          )}
-        </div>
-        <div>
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Economic moat</p>
-          <p className="mt-1 text-xl font-bold text-foreground">
-            {business.economicMoat.type ? MOAT_LABEL[business.economicMoat.type] : "Not yet assessed"}
-          </p>
-          {business.economicMoat.strengthScore !== undefined && (
-            <p className="mt-1 text-xs text-muted-foreground">Strength: {business.economicMoat.strengthScore}/100</p>
-          )}
-          {business.economicMoat.rationale && (
-            <p className="mt-1 text-xs text-muted-foreground">{business.economicMoat.rationale}</p>
-          )}
-        </div>
-        <div>
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Execution complexity</p>
-          <p className="mt-1 text-xl font-bold text-foreground">
-            {business.executionComplexity ? COMPLEXITY_LABEL[business.executionComplexity] : "Not yet assessed"}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Competitive position</p>
-          <p className="mt-1 text-xl font-bold text-foreground">
-            {business.competitivePosition ?? "Not yet assessed"}
-          </p>
-        </div>
+        <StatCell
+          label="Overall health"
+          value={business.overallHealth.rating ? HEALTH_LABEL[business.overallHealth.rating] : "Not yet assessed"}
+          captions={business.overallHealth.rationale ? [{ text: business.overallHealth.rationale }] : []}
+        />
+        <StatCell
+          label="Economic moat"
+          value={business.economicMoat.type ? MOAT_LABEL[business.economicMoat.type] : "Not yet assessed"}
+          captions={[
+            ...(business.economicMoat.strengthScore !== undefined
+              ? [{ text: `Strength: ${business.economicMoat.strengthScore}/100` }]
+              : []),
+            ...(business.economicMoat.rationale ? [{ text: business.economicMoat.rationale }] : []),
+          ]}
+        />
+        <StatCell
+          label="Execution complexity"
+          value={business.executionComplexity ? COMPLEXITY_LABEL[business.executionComplexity] : "Not yet assessed"}
+        />
+        <StatCell label="Competitive position" value={business.competitivePosition ?? "Not yet assessed"} />
       </div>
 
       {(business.revenueStrategy || business.goToMarketStrategy || business.growthStrategy) && (
@@ -183,28 +151,28 @@ export default function BusinessIntelligenceCard({ business }: BusinessIntellige
       {hasDistributionChannels && (
         <div>
           <h3 className="mb-2 text-sm font-semibold text-foreground">Distribution channels</h3>
-          <StringBadgeList items={business.distributionChannels} />
+          <TagList items={business.distributionChannels} />
         </div>
       )}
 
       {hasGrowthDrivers && (
         <div>
           <h3 className="mb-2 text-sm font-semibold text-foreground">Growth drivers</h3>
-          <StringBadgeList items={business.growthDrivers} />
+          <TagList items={business.growthDrivers} />
         </div>
       )}
 
       {hasExpansionOpportunities && (
         <div>
           <h3 className="mb-2 text-sm font-semibold text-foreground">Expansion opportunities</h3>
-          <StringBadgeList items={business.expansionOpportunities} />
+          <TagList items={business.expansionOpportunities} />
         </div>
       )}
 
       {hasCompetitiveAdvantages && (
         <div>
           <h3 className="mb-2 text-sm font-semibold text-foreground">Competitive advantages</h3>
-          <StringBadgeList items={business.competitiveAdvantages} />
+          <TagList items={business.competitiveAdvantages} />
         </div>
       )}
 
@@ -215,7 +183,7 @@ export default function BusinessIntelligenceCard({ business }: BusinessIntellige
             {business.keyDependencies.map((dependency, index) => (
               <li key={index} className="flex flex-wrap items-center gap-2 text-sm">
                 {dependency.criticality && (
-                  <Badge variant={SEVERITY_TONE[dependency.criticality]}>{dependency.criticality}</Badge>
+                  <Badge variant={severityBadgeVariant(dependency.criticality)}>{dependency.criticality}</Badge>
                 )}
                 <span className="font-medium text-foreground">{dependency.name}</span>
                 {dependency.description && <span className="text-muted-foreground">— {dependency.description}</span>}
@@ -231,7 +199,7 @@ export default function BusinessIntelligenceCard({ business }: BusinessIntellige
           <ul className="space-y-2">
             {business.operationalRisks.map((risk, index) => (
               <li key={index} className="flex flex-wrap items-center gap-2 text-sm">
-                {risk.severity && <Badge variant={SEVERITY_TONE[risk.severity]}>{risk.severity}</Badge>}
+                {risk.severity && <Badge variant={severityBadgeVariant(risk.severity)}>{risk.severity}</Badge>}
                 <span className="font-medium text-foreground">{risk.name}</span>
                 {risk.description && <span className="text-muted-foreground">— {risk.description}</span>}
               </li>
@@ -240,21 +208,7 @@ export default function BusinessIntelligenceCard({ business }: BusinessIntellige
         </div>
       )}
 
-      {hasEvidence && (
-        <div>
-          <h3 className="mb-2 text-sm font-semibold text-foreground">Evidence</h3>
-          <ul className="space-y-1 border-l border-border pl-3">
-            {business.evidence.map((evidence) => (
-              <li key={evidence.id} className="text-xs text-muted-foreground">
-                {evidence.evidence}{" "}
-                <a href={evidence.url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                  (source)
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <EvidenceList evidence={business.evidence} />
     </Card>
   );
 }

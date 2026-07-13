@@ -4,6 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import SectionHeader from "@/components/shared/SectionHeader";
 import IconBadge from "@/components/shared/IconBadge";
 import EmptyState from "@/components/shared/EmptyState";
+import StatCell from "@/components/shared/StatCell";
+import TagList from "@/components/shared/TagList";
+import StringList from "@/components/shared/StringList";
+import EvidenceList from "@/components/shared/EvidenceList";
 import { formatPercent } from "@/lib/format";
 import type { CompanyProfile, CompetitorCategory } from "@/lib/competitors";
 
@@ -17,16 +21,6 @@ const CATEGORY_LABEL: Record<CompetitorCategory, string> = {
   adjacent: "Adjacent",
   aspirational: "Aspirational",
 };
-
-function StringList({ items }: { items: string[] }) {
-  return (
-    <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
-      {items.map((item, index) => (
-        <li key={index}>{item}</li>
-      ))}
-    </ul>
-  );
-}
 
 // Renders every field CompanyProfile already carries — no field is
 // renamed, recomputed, or restructured; each value below reads directly
@@ -59,10 +53,7 @@ function CompetitorSubCard({ competitor }: { competitor: CompanyProfile }) {
             <p className="mt-2 text-sm text-muted-foreground">{competitor.description}</p>
           )}
         </div>
-        <div className="text-right">
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Confidence</p>
-          <p className="mt-1 text-xl font-bold text-foreground">{formatPercent(Math.round(competitor.confidence))}</p>
-        </div>
+        <StatCell label="Confidence" value={formatPercent(Math.round(competitor.confidence))} className="text-right" />
       </div>
 
       {competitor.website && (
@@ -84,14 +75,12 @@ function CompetitorSubCard({ competitor }: { competitor: CompanyProfile }) {
             <p className="mb-1 text-sm text-muted-foreground">{competitor.pricing.model}</p>
           )}
           {competitor.pricing && competitor.pricing.tiers.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {competitor.pricing.tiers.map((tier, index) => (
-                <Badge key={index} variant="secondary">
-                  {tier.name}
-                  {tier.priceUsd !== undefined ? ` — $${tier.priceUsd}` : ""}
-                </Badge>
-              ))}
-            </div>
+            <TagList
+              variant="secondary"
+              items={competitor.pricing.tiers.map(
+                (tier) => `${tier.name}${tier.priceUsd !== undefined ? ` — $${tier.priceUsd}` : ""}`
+              )}
+            />
           )}
         </div>
       )}
@@ -99,13 +88,7 @@ function CompetitorSubCard({ competitor }: { competitor: CompanyProfile }) {
       {competitor.features.length > 0 && (
         <div className="mb-4">
           <h4 className="mb-1.5 text-sm font-semibold text-foreground">Features</h4>
-          <div className="flex flex-wrap gap-2">
-            {competitor.features.map((feature, index) => (
-              <Badge key={index} variant="outline">
-                {feature}
-              </Badge>
-            ))}
-          </div>
+          <TagList items={competitor.features} />
         </div>
       )}
 
@@ -115,40 +98,18 @@ function CompetitorSubCard({ competitor }: { competitor: CompanyProfile }) {
             <h4 className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-foreground">
               <ThumbsUp className="h-3.5 w-3.5 text-success" /> Strengths
             </h4>
-            {competitor.strengths.length > 0 ? (
-              <StringList items={competitor.strengths} />
-            ) : (
-              <p className="text-sm text-muted-foreground">None identified yet.</p>
-            )}
+            <StringList items={competitor.strengths} empty="None identified yet." spacing="tight" />
           </div>
           <div>
             <h4 className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-foreground">
               <ThumbsDown className="h-3.5 w-3.5 text-destructive" /> Weaknesses
             </h4>
-            {competitor.weaknesses.length > 0 ? (
-              <StringList items={competitor.weaknesses} />
-            ) : (
-              <p className="text-sm text-muted-foreground">None identified yet.</p>
-            )}
+            <StringList items={competitor.weaknesses} empty="None identified yet." spacing="tight" />
           </div>
         </div>
       )}
 
-      {competitor.evidence.length > 0 && (
-        <div>
-          <h4 className="mb-1.5 text-sm font-semibold text-foreground">Evidence</h4>
-          <ul className="space-y-1 border-l border-border pl-3">
-            {competitor.evidence.map((evidence) => (
-              <li key={evidence.id} className="text-xs text-muted-foreground">
-                {evidence.evidence}{" "}
-                <a href={evidence.url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                  (source)
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <EvidenceList evidence={competitor.evidence} headingTag="h4" />
     </div>
   );
 }

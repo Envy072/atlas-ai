@@ -5,20 +5,12 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import SectionHeader from "@/components/shared/SectionHeader";
 import IconBadge from "@/components/shared/IconBadge";
+import StatCell from "@/components/shared/StatCell";
 import { formatPercent, formatRelativeTime } from "@/lib/format";
 import type { VerificationSummary } from "@/lib/verification";
 
 interface TrustPanelProps {
   verification: VerificationSummary;
-}
-
-function ConfidenceStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
-    </div>
-  );
 }
 
 // Reserved for "actually needs attention" states elsewhere
@@ -63,12 +55,13 @@ export default function TrustPanel({ verification }: TrustPanelProps) {
       </div>
 
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-        <ConfidenceStat label="Evidence confidence" value={formatPercent(Math.round(confidence.evidenceConfidence))} />
-        <ConfidenceStat label="Coverage" value={formatPercent(Math.round(confidence.coverage))} />
-        <ConfidenceStat label="Unknown" value={formatPercent(Math.round(confidence.unknownPercentage))} />
-        <ConfidenceStat
+        <StatCell label="Evidence confidence" value={formatPercent(Math.round(confidence.evidenceConfidence))} size="lg" />
+        <StatCell label="Coverage" value={formatPercent(Math.round(confidence.coverage))} size="lg" />
+        <StatCell label="Unknown" value={formatPercent(Math.round(confidence.unknownPercentage))} size="lg" />
+        <StatCell
           label="Data freshness"
           value={confidence.dataFreshnessDays !== undefined ? `${Math.round(confidence.dataFreshnessDays)}d` : "—"}
+          size="lg"
         />
       </div>
 

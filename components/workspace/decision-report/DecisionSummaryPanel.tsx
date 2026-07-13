@@ -3,35 +3,12 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import SectionHeader from "@/components/shared/SectionHeader";
 import IconBadge from "@/components/shared/IconBadge";
+import StringList from "@/components/shared/StringList";
+import { severityBadgeVariant } from "@/components/shared/severityTone";
 import type { DecisionProfile } from "@/lib/decision";
 
 interface DecisionSummaryPanelProps {
   profile: DecisionProfile;
-}
-
-// A single, honest severity→tone mapping shared by both Finding's
-// three-level Severity and RiskFinding's four-level RedFlagSeverity
-// (MILESTONE_15_DESIGN.md's complexity review) — replaces the prior
-// inconsistency where every critical risk showed a blanket "destructive"
-// badge regardless of its actual severity, which misrepresented a "low"
-// risk as being as alarming as a "critical" one.
-function severityBadgeVariant(severity: string): "destructive" | "warning" | "secondary" {
-  if (severity === "critical" || severity === "high") return "destructive";
-  if (severity === "medium") return "warning";
-  return "secondary";
-}
-
-function StringList({ items, empty }: { items: string[]; empty: string }) {
-  if (items.length === 0) {
-    return <p className="text-sm text-muted-foreground">{empty}</p>;
-  }
-  return (
-    <ul className="list-disc space-y-1.5 pl-5 text-sm text-foreground">
-      {items.map((item, index) => (
-        <li key={index}>{item}</li>
-      ))}
-    </ul>
-  );
 }
 
 // Renders DecisionProfile's own synthesized material — investment thesis
@@ -60,42 +37,42 @@ export default function DecisionSummaryPanel({ profile }: DecisionSummaryPanelPr
           <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
             <TrendingUp className="h-4 w-4 text-success" /> Positive arguments
           </h3>
-          <StringList items={investmentThesis.positiveArguments} empty="None identified yet." />
+          <StringList items={investmentThesis.positiveArguments} empty="None identified yet." spacing="normal" />
         </div>
         <div>
           <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
             <TrendingDown className="h-4 w-4 text-destructive" /> Negative arguments
           </h3>
-          <StringList items={investmentThesis.negativeArguments} empty="None identified yet." />
+          <StringList items={investmentThesis.negativeArguments} empty="None identified yet." spacing="normal" />
         </div>
         <div>
           <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
             <HelpCircle className="h-4 w-4 text-muted-foreground" /> Unknowns
           </h3>
-          <StringList items={investmentThesis.unknowns} empty="None recorded." />
+          <StringList items={investmentThesis.unknowns} empty="None recorded." spacing="normal" />
         </div>
         <div>
           <h3 className="mb-2 text-sm font-semibold text-foreground">Contradictions</h3>
-          <StringList items={investmentThesis.contradictions} empty="None found." />
+          <StringList items={investmentThesis.contradictions} empty="None found." spacing="normal" />
         </div>
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2">
         <div>
           <h3 className="mb-2 text-sm font-semibold text-foreground">Strengths</h3>
-          <StringList items={strengths} empty="None recorded yet." />
+          <StringList items={strengths} empty="None recorded yet." spacing="normal" />
         </div>
         <div>
           <h3 className="mb-2 text-sm font-semibold text-foreground">Weaknesses</h3>
-          <StringList items={weaknesses} empty="None recorded yet." />
+          <StringList items={weaknesses} empty="None recorded yet." spacing="normal" />
         </div>
         <div>
           <h3 className="mb-2 text-sm font-semibold text-foreground">Opportunities</h3>
-          <StringList items={opportunities} empty="None recorded yet." />
+          <StringList items={opportunities} empty="None recorded yet." spacing="normal" />
         </div>
         <div>
           <h3 className="mb-2 text-sm font-semibold text-foreground">Threats</h3>
-          <StringList items={threats} empty="None recorded yet." />
+          <StringList items={threats} empty="None recorded yet." spacing="normal" />
         </div>
       </div>
 

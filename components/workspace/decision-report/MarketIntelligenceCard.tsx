@@ -13,11 +13,14 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import SectionHeader from "@/components/shared/SectionHeader";
 import IconBadge from "@/components/shared/IconBadge";
+import StatCell from "@/components/shared/StatCell";
+import TagList from "@/components/shared/TagList";
+import EvidenceList from "@/components/shared/EvidenceList";
+import { severityBadgeVariant } from "@/components/shared/severityTone";
 import { formatPercent, formatCurrencyUsd } from "@/lib/format";
 import type {
   MarketProfile,
   MarketSizeEstimate,
-  Severity,
   TrendDirection,
 } from "@/lib/market";
 
@@ -32,12 +35,6 @@ const MATURITY_LABEL: Record<NonNullable<MarketProfile["marketMaturity"]>, strin
   declining: "Declining",
 };
 
-const SEVERITY_TONE: Record<Severity, "secondary" | "warning" | "destructive"> = {
-  low: "secondary",
-  medium: "warning",
-  high: "destructive",
-};
-
 const TREND_ICON: Record<TrendDirection, LucideIcon> = {
   rising: TrendingUp,
   stable: Minus,
@@ -50,18 +47,24 @@ const TREND_ICON_CLASS: Record<TrendDirection, string> = {
   declining: "text-destructive",
 };
 
+function sizeEstimateCaptions(estimate: MarketSizeEstimate) {
+  const captions: Array<{ text: string; className?: string }> = [];
+  if (estimate.asOfYear !== undefined) {
+    captions.push({ text: `as of ${estimate.asOfYear}`, className: "mt-0.5 text-xs text-muted-foreground" });
+  }
+  if (estimate.methodology) {
+    captions.push({ text: estimate.methodology });
+  }
+  return captions;
+}
+
 function SizeStat({ label, estimate }: { label: string; estimate: MarketSizeEstimate }) {
   return (
-    <div>
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
-      <p className="mt-1 text-xl font-bold text-foreground">
-        {estimate.valueUsd !== undefined ? formatCurrencyUsd(estimate.valueUsd) : "Not yet known"}
-      </p>
-      {estimate.asOfYear !== undefined && (
-        <p className="mt-0.5 text-xs text-muted-foreground">as of {estimate.asOfYear}</p>
-      )}
-      {estimate.methodology && <p className="mt-1 text-xs text-muted-foreground">{estimate.methodology}</p>}
-    </div>
+    <StatCell
+      label={label}
+      value={estimate.valueUsd !== undefined ? formatCurrencyUsd(estimate.valueUsd) : "Not yet known"}
+      captions={sizeEstimateCaptions(estimate)}
+    />
   );
 }
 
@@ -80,7 +83,6 @@ export default function MarketIntelligenceCard({ market }: MarketIntelligenceCar
   const hasRisks = market.risks.length > 0;
   const hasTrends = market.trends.length > 0;
   const hasSegments = market.customerSegments.length > 0;
-  const hasEvidence = market.evidence.length > 0;
 
   return (
     <Card className="space-y-6 p-7">
@@ -99,10 +101,7 @@ export default function MarketIntelligenceCard({ market }: MarketIntelligenceCar
         </div>
         <div className="flex items-center gap-3">
           {market.marketMaturity && <Badge variant="outline">{MATURITY_LABEL[market.marketMaturity]}</Badge>}
-          <div className="text-right">
-            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Confidence</p>
-            <p className="mt-1 text-xl font-bold text-foreground">{formatPercent(Math.round(market.confidence))}</p>
-          </div>
+          <StatCell label="Confidence" value={formatPercent(Math.round(market.confidence))} className="text-right" />
         </div>
       </div>
 
@@ -110,15 +109,15 @@ export default function MarketIntelligenceCard({ market }: MarketIntelligenceCar
         <SizeStat label="TAM" estimate={market.sizing.tam} />
         <SizeStat label="SAM" estimate={market.sizing.sam} />
         <SizeStat label="SOM" estimate={market.sizing.som} />
-        <div>
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Growth</p>
-          <p className="mt-1 text-xl font-bold text-foreground">
-            {market.growthRate?.cagrPercent !== undefined ? `${market.growthRate.cagrPercent}% CAGR` : "Not yet known"}
-          </p>
-          {market.growthRate?.periodYears !== undefined && (
-            <p className="mt-0.5 text-xs text-muted-foreground">over {market.growthRate.periodYears}y</p>
-          )}
-        </div>
+        <StatCell
+          label="Growth"
+          value={market.growthRate?.cagrPercent !== undefined ? `${market.growthRate.cagrPercent}% CAGR` : "Not yet known"}
+          captions={
+            market.growthRate?.periodYears !== undefined
+              ? [{ text: `over ${market.growthRate.periodYears}y`, className: "mt-0.5 text-xs text-muted-foreground" }]
+              : []
+          }
+        />
       </div>
 
       {hasSegments && (
@@ -152,15 +151,14 @@ export default function MarketIntelligenceCard({ market }: MarketIntelligenceCar
           <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
             <MapPin className="h-3.5 w-3.5 text-muted-foreground" /> Geographic markets
           </h3>
-          <div className="flex flex-wrap gap-2">
-            {market.geographicMarkets.map((geo, index) => (
-              <Badge key={index} variant="outline">
-                {geo.region}
-                {geo.country ? ` (${geo.country})` : ""}
-                {geo.marketSizeUsd !== undefined ? ` — ${formatCurrencyUsd(geo.marketSizeUsd)}` : ""}
-              </Badge>
-            ))}
-          </div>
+          <TagList
+            items={market.geographicMarkets.map(
+              (geo) =>
+                `${geo.region}${geo.country ? ` (${geo.country})` : ""}${
+                  geo.marketSizeUsd !== undefined ? ` — ${formatCurrencyUsd(geo.marketSizeUsd)}` : ""
+                }`
+            )}
+          />
         </div>
       )}
 
@@ -193,7 +191,7 @@ export default function MarketIntelligenceCard({ market }: MarketIntelligenceCar
             {market.regulations.map((regulation, index) => (
               <li key={index} className="flex flex-wrap items-center gap-2 text-sm">
                 {regulation.severity && (
-                  <Badge variant={SEVERITY_TONE[regulation.severity]}>{regulation.severity}</Badge>
+                  <Badge variant={severityBadgeVariant(regulation.severity)}>{regulation.severity}</Badge>
                 )}
                 <span className="font-medium text-foreground">{regulation.name}</span>
                 {regulation.jurisdiction && (
@@ -214,7 +212,7 @@ export default function MarketIntelligenceCard({ market }: MarketIntelligenceCar
           <ul className="space-y-2">
             {market.risks.map((risk, index) => (
               <li key={index} className="flex flex-wrap items-center gap-2 text-sm">
-                {risk.severity && <Badge variant={SEVERITY_TONE[risk.severity]}>{risk.severity}</Badge>}
+                {risk.severity && <Badge variant={severityBadgeVariant(risk.severity)}>{risk.severity}</Badge>}
                 <span className="font-medium text-foreground">{risk.name}</span>
                 {risk.description && <span className="text-muted-foreground">— {risk.description}</span>}
               </li>
@@ -223,21 +221,7 @@ export default function MarketIntelligenceCard({ market }: MarketIntelligenceCar
         </div>
       )}
 
-      {hasEvidence && (
-        <div>
-          <h3 className="mb-2 text-sm font-semibold text-foreground">Evidence</h3>
-          <ul className="space-y-1 border-l border-border pl-3">
-            {market.evidence.map((evidence) => (
-              <li key={evidence.id} className="text-xs text-muted-foreground">
-                {evidence.evidence}{" "}
-                <a href={evidence.url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                  (source)
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <EvidenceList evidence={market.evidence} />
     </Card>
   );
 }
