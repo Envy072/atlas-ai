@@ -6,12 +6,11 @@ import { createBrowserClient } from "@supabase/ssr";
 // this: every actual data read/write still goes through this app's own
 // API routes/Server Components, exactly as before this milestone.
 //
-// This is deliberately a separate file from lib/supabase.ts (the
-// existing, unmodified anon-key client lib/services/projects.ts uses)
-// rather than a replacement of it — that file has no session/cookie
-// dependency at all today, so there's nothing to migrate yet. The two
-// are expected to consolidate once ownership/RLS work (a future
-// milestone) needs table queries to become session-aware too.
+// A separate file from the old lib/supabase.ts anon-key client, which
+// is now deprecated and unused: lib/services/projects.ts switched to
+// lib/supabase/server.ts's cookie-aware client in Milestone 27c, since
+// RLS's auth.uid() only resolves correctly when the query is made by a
+// client carrying that request's own session.
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

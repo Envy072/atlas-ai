@@ -35,7 +35,7 @@ export default function AIWorkspace({ projects }: AIWorkspaceProps) {
   // happens entirely client-side (useAnalysisSession's polling), so
   // nothing re-runs that fetch on its own. router.refresh() re-executes
   // the Server Component tree for the current route (picking up the
-  // project persistAnalysisSession just saved) without losing this
+  // project persistProjectFromSession just saved) without losing this
   // client component's own state (the in-progress/completed view stays
   // exactly as rendered) or scroll position — the minimal, correct tool
   // for this, not a full reload.

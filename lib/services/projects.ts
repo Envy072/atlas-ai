@@ -3,13 +3,12 @@ import { ProjectSchema } from "@/lib/schemas/project";
 import type { Project } from "@/lib/schemas/project";
 import type { AnalysisSessionView } from "@/lib/schemas/analysisSessionView";
 
-// Uses the cookie-aware server client (lib/supabase/server.ts), not the
-// deprecated lib/supabase.ts anon-key client — required for RLS
-// (MILESTONE_27_DESIGN.md / Milestone 27c). auth.uid(), which every RLS
-// policy on this table keys on, only resolves to a real user id when
-// the query is executed by a client carrying that request's own
-// session; the old anon-key client never carried one, which would make
-// the policies below evaluate false for everyone, including the
+// Uses the cookie-aware server client (lib/supabase/server.ts) —
+// required for RLS (MILESTONE_27_DESIGN.md / Milestone 27c). auth.uid(),
+// which every RLS policy on this table keys on, only resolves to a real
+// user id when the query is executed by a client carrying that
+// request's own session; a client with no per-request identity would
+// make the policies below evaluate false for everyone, including the
 // rightful owner, not just deny wrongdoers. A second, deliberate,
 // named exception to "services are framework-agnostic" (CLAUDE.md
 // Section 8), alongside lib/services/auth.ts, for the same underlying

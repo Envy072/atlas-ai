@@ -259,8 +259,11 @@ See Section 8. Never: React, Next.js request/response objects.
 **`lib/store/`** — Zustand store definitions (`analysisStore.ts`). Never:
 more than one store per genuinely distinct domain of shared state.
 
-**`lib/supabase.ts`** — exactly one thing, the shared Supabase client.
-Never: query logic (that's `lib/services/`).
+**`lib/supabase/`** — the two shared Supabase client factories:
+`client.ts` (browser, cookie-based session) and `server.ts` (server,
+cookie-aware via `next/headers`, the one every service querying
+`projects` must use for RLS's `auth.uid()` to resolve correctly). Never:
+query logic (that's `lib/services/`), a third client construction point.
 
 **`lib/utils.ts`** — the shadcn `cn()` helper and equivalents. Never:
 feature-specific logic (`lib/format.ts`, a service, or a hook instead).
@@ -389,19 +392,21 @@ future table is added here, never inlined into a page/component. If a
 query's failure *should* be fatal, throw `ExternalServiceError("Supabase", ...)`
 explicitly. As of Milestone 27c, this file is a second, explicit instance
 of `auth.ts`'s own "framework-agnostic" exception below — it queries
-through `lib/supabase/server.ts`'s cookie-aware client (not the
-deprecated `lib/supabase.ts`), since RLS's `auth.uid()` requires a
-per-request session to resolve correctly.
+through `lib/supabase/server.ts`'s cookie-aware client, since RLS's
+`auth.uid()` requires a per-request session to resolve correctly.
 
 **Future Stripe service** (`stripe.ts`, Milestone 5) follows the same
 shape: owns the Stripe client and raw calls, with a higher-level function
 combining Stripe + Supabase writes. Nothing outside `lib/services/` imports
 `stripe` directly.
 
-**Future Auth service** (`auth.ts`, Milestone 4) owns session verification
-and user lookup. Routes/Server Components call something like
-`getCurrentUser(request)` — they don't parse cookies or verify tokens
-themselves.
+**Auth service** (`auth.ts`, Milestone 27a) owns session verification and
+user lookup via `getCurrentUser(): Promise<AuthUser | null>` — the sole
+server-side identity entry point. Routes/Server Components call this;
+they never parse cookies or call Supabase Auth directly themselves.
+Built on `lib/supabase/server.ts`'s cookie-aware client, which is why
+this file (like `projects.ts` above) is a deliberate, named exception to
+"services are framework-agnostic."
 
 ---
 
@@ -618,12 +623,11 @@ tokens already do this on `components/ui/` — don't override them away).
   plus a `references auth.users(id)` foreign key on `owner_id` — no
   longer an open, unverified item for that table specifically. This only
   holds as long as every query against `projects` goes through a
-  session-aware client (`lib/supabase/server.ts`), never the deprecated,
-  anon-key-only `lib/supabase.ts` — a client with no per-request identity
-  makes `auth.uid()` resolve to nothing, silently returning zero rows for
-  everyone rather than enforcing anything. Any future table added to this
-  database inherits the same requirement and starts from the same
-  "unverified until proven otherwise" assumption.
+  session-aware client (`lib/supabase/server.ts`) — a client with no
+  per-request identity makes `auth.uid()` resolve to nothing, silently
+  returning zero rows for everyone rather than enforcing anything. Any
+  future table added to this database inherits the same requirement and
+  starts from the same "unverified until proven otherwise" assumption.
 - **OpenAI calls happen server-side only.** `OPENAI_API_KEY` is never read
   in a `"use client"` file or exposed in a response payload — always
   through `lib/services/openai.ts`.
