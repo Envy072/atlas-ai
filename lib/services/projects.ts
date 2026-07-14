@@ -1,7 +1,19 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 import { ProjectSchema } from "@/lib/schemas/project";
 import type { Project } from "@/lib/schemas/project";
 import type { AnalysisSessionView } from "@/lib/schemas/analysisSessionView";
+
+// Uses the cookie-aware server client (lib/supabase/server.ts), not the
+// deprecated lib/supabase.ts anon-key client — required for RLS
+// (MILESTONE_27_DESIGN.md / Milestone 27c). auth.uid(), which every RLS
+// policy on this table keys on, only resolves to a real user id when
+// the query is executed by a client carrying that request's own
+// session; the old anon-key client never carried one, which would make
+// the policies below evaluate false for everyone, including the
+// rightful owner, not just deny wrongdoers. A second, deliberate,
+// named exception to "services are framework-agnostic" (CLAUDE.md
+// Section 8), alongside lib/services/auth.ts, for the same underlying
+// reason: something has to read the request's cookies.
 
 // Raw shape of a `projects` table row exactly as Postgres/Supabase
 // returns it (snake_case columns) — never exposed past this file.
@@ -42,14 +54,25 @@ function fromRow(row: ProjectRow): Project | null {
 }
 
 // Reads the project list for /projects, /dashboard, and
-// /dashboard/analysis's History panel. Returns an empty list (and logs)
-// on failure, or on any individually malformed row, rather than
-// throwing — matching this file's own established tolerant-read
-// convention.
-export async function listProjects(): Promise<Project[]> {
+// /dashboard/analysis's History panel — always scoped to one specific
+// user (Milestone 27c: "users must never access another user's
+// projects"). Callers with no authenticated user must not call this at
+// all (an empty list, decided at the call site) rather than pass a
+// placeholder id here. Returns an empty list (and logs) on failure, or
+// on any individually malformed row, rather than throwing — matching
+// this file's own established tolerant-read convention.
+//
+// The .eq("owner_id", userId) filter is application-layer enforcement;
+// the RLS policy on this table (supabase/migrations/) is the
+// database-layer backstop for the same rule — deliberately both,
+// neither replaces the other (CLAUDE.md Section 14).
+export async function listProjects(userId: string): Promise<Project[]> {
+  const supabase = await createClient();
+
   const { data, error } = await supabase
     .from("projects")
     .select("*")
+    .eq("owner_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -70,7 +93,11 @@ export async function listProjects(): Promise<Project[]> {
 //
 // A no-op unless the session actually finished (mirrors AIWorkspace's
 // own completion gate: state === "completed" with both a result and a
-// verification summary present).
+// verification summary present) — AND, as of Milestone 27c, unless a
+// real, authenticated user is behind this call. "Saving a Project
+// requires authentication" (the approved product decision) means
+// exactly this: an anonymous completion is never persisted at all, not
+// persisted with a null owner the way it was before this milestone.
 //
 // IMMUTABILITY (MILESTONE_26_DESIGN.md Section 3.2/4, a binding
 // requirement, not a preference): this function only ever calls
@@ -83,10 +110,13 @@ export async function listProjects(): Promise<Project[]> {
 // — a persistence hiccup must never fail the user-facing analysis
 // response, matching this file's pre-existing error-handling
 // convention.
-export async function persistProjectFromSession(view: AnalysisSessionView): Promise<void> {
+export async function persistProjectFromSession(
+  view: AnalysisSessionView,
+  userId: string | null
+): Promise<void> {
   const { session, verification } = view;
 
-  if (session.state !== "completed" || !session.result || !verification) {
+  if (session.state !== "completed" || !session.result || !verification || !userId) {
     return;
   }
 
@@ -101,7 +131,7 @@ export async function persistProjectFromSession(view: AnalysisSessionView): Prom
     executionId: session.executionId,
     title: session.title,
     createdAt: session.updatedAt,
-    ownerId: null,
+    ownerId: userId,
     profile: session.result.profile,
     verification,
   });
@@ -124,6 +154,7 @@ export async function persistProjectFromSession(view: AnalysisSessionView): Prom
     verification: project.verification,
   };
 
+  const supabase = await createClient();
   const { error } = await supabase.from("projects").insert(row);
 
   if (error) {

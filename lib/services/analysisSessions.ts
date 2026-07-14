@@ -30,44 +30,65 @@ export type { CreateSessionInput };
 // funnels through here, so persistence is attempted uniformly on every
 // observation of a session's view, not just the polling GET path.
 // persistProjectFromSession is itself a no-op unless the session is
-// actually completed, and is insert-only/idempotent per session id
-// (never an upsert), so calling it on every view composition — an
+// actually completed AND a real user id is provided (Milestone 27c: a
+// null userId means "anonymous," which now means "never persisted," not
+// "persisted with no owner"), and is insert-only/idempotent per session
+// id (never an upsert), so calling it on every view composition — an
 // initial start, a poll, a cancel, a retry — is always safe and never
 // overwrites an already-persisted snapshot.
-async function toView(session: AnalysisSession): Promise<AnalysisSessionView> {
+//
+// userId is passed through from whichever route called in — this file
+// never calls getCurrentUser() itself (that would import next/headers
+// into an otherwise framework-agnostic file for no reason; the route
+// layer already has it). None of the four analysis-session routes
+// require a user (they stay public, per the approved anonymous-analysis
+// decision) — userId is read and forwarded, never enforced, here.
+async function toView(session: AnalysisSession, userId: string | null): Promise<AnalysisSessionView> {
   const view: AnalysisSessionView = {
     session,
     verification: buildVerificationSummaryFromSession(session),
   };
 
-  await persistProjectFromSession(view);
+  await persistProjectFromSession(view, userId);
 
   return view;
 }
 
-export async function startAnalysisSession(input: CreateSessionInput): Promise<AnalysisSessionView> {
+export async function startAnalysisSession(
+  input: CreateSessionInput,
+  userId: string | null
+): Promise<AnalysisSessionView> {
   const session = await createSession(input);
-  return toView(session);
+  return toView(session, userId);
 }
 
-export async function getAnalysisSession(id: string): Promise<AnalysisSessionView | null> {
+export async function getAnalysisSession(
+  id: string,
+  userId: string | null
+): Promise<AnalysisSessionView | null> {
   const session = await getSession(id);
   if (!session) return null;
-  return toView(session);
+  return toView(session, userId);
 }
 
-export async function cancelAnalysisSession(id: string): Promise<AnalysisSessionView> {
+export async function cancelAnalysisSession(
+  id: string,
+  userId: string | null
+): Promise<AnalysisSessionView> {
   if (!id.trim()) {
     throw new InvalidRequestError("A session id is required.");
   }
   const session = await cancelSession(id);
-  return toView(session);
+  return toView(session, userId);
 }
 
-export async function retryAnalysisSession(id: string): Promise<AnalysisSessionView> {
+export async function retryAnalysisSession(
+  id: string,
+  userId: string | null
+): Promise<AnalysisSessionView> {
   if (!id.trim()) {
     throw new InvalidRequestError("A session id is required.");
   }
   const session = await retrySession(id);
-  return toView(session);
+  return toView(session, userId);
 }

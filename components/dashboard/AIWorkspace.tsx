@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Sparkles, AlertCircle } from "lucide-react";
 import { useAnalysisSession, isTerminalSessionState } from "@/hooks/useAnalysisSession";
 import type { Project } from "@/lib/schemas/project";
@@ -25,8 +26,24 @@ interface AIWorkspaceProps {
 // composition role (input → loading/progress → result, history beside
 // it) is unchanged.
 export default function AIWorkspace({ projects }: AIWorkspaceProps) {
+  const router = useRouter();
   const [idea, setIdea] = useState("");
   const { view, status, error, start, cancel, retry } = useAnalysisSession();
+
+  // ReportHistoryPanel's `projects` prop is fetched once, server-side, at
+  // page-load time (app/dashboard/analysis/page.tsx) — analyzing an idea
+  // happens entirely client-side (useAnalysisSession's polling), so
+  // nothing re-runs that fetch on its own. router.refresh() re-executes
+  // the Server Component tree for the current route (picking up the
+  // project persistAnalysisSession just saved) without losing this
+  // client component's own state (the in-progress/completed view stays
+  // exactly as rendered) or scroll position — the minimal, correct tool
+  // for this, not a full reload.
+  useEffect(() => {
+    if (view?.session.state === "completed") {
+      router.refresh();
+    }
+  }, [view?.session.state, router]);
 
   async function analyzeIdea() {
     await start(idea);

@@ -1,5 +1,7 @@
+import { redirect } from "next/navigation";
 import { FolderKanban } from "lucide-react";
 import { listProjects } from "@/lib/services/projects";
+import { getCurrentUser } from "@/lib/services/auth";
 import { formatPercent } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,8 +16,18 @@ import EmptyState from "@/components/shared/EmptyState";
 // customerProblem/valueProposition are BusinessSummary's real, optional
 // fields, each falling back to an honest "Not yet known" rather than a
 // blank space.
+//
+// Already protected by middleware.ts (Milestone 27b) — this check
+// (Milestone 27c) supplies the real user id listProjects() now requires
+// and scopes every returned project to that user, never assumed
+// present just because middleware ran.
 export default async function ProjectsPage() {
-  const projects = await listProjects();
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect("/login");
+  }
+
+  const projects = await listProjects(user.id);
 
   return (
     <div className="mx-auto max-w-5xl p-8">

@@ -381,12 +381,17 @@ analysis — never call `generateStartupAnalysis` directly, which would skip
 validation.
 
 **Projects service** (`projects.ts`) owns all reads/writes to the Supabase
-`projects` table. `createProject` logs and swallows a failure rather than
-throwing (a persistence hiccup shouldn't fail the user-facing response);
-`listProjects` returns `[]` (with a logged error) on failure so callers
-never null-check. Any new query against this or a future table is added
-here, never inlined into a page/component. If a query's failure *should* be
-fatal, throw `ExternalServiceError("Supabase", ...)` explicitly.
+`projects` table. `persistProjectFromSession` logs and swallows a failure
+rather than throwing (a persistence hiccup shouldn't fail the user-facing
+response); `listProjects(userId)` returns `[]` (with a logged error) on
+failure so callers never null-check. Any new query against this or a
+future table is added here, never inlined into a page/component. If a
+query's failure *should* be fatal, throw `ExternalServiceError("Supabase", ...)`
+explicitly. As of Milestone 27c, this file is a second, explicit instance
+of `auth.ts`'s own "framework-agnostic" exception below — it queries
+through `lib/supabase/server.ts`'s cookie-aware client (not the
+deprecated `lib/supabase.ts`), since RLS's `auth.uid()` requires a
+per-request session to resolve correctly.
 
 **Future Stripe service** (`stripe.ts`, Milestone 5) follows the same
 shape: owns the Stripe client and raw calls, with a higher-level function
@@ -607,12 +612,18 @@ tokens already do this on `components/ui/` — don't override them away).
   to read (the Supabase anon key qualifies only because Supabase's security
   model relies on Row Level Security at the database layer, not key
   secrecy). Never prefix a real secret with `NEXT_PUBLIC_`.
-- **Supabase security is a database-layer responsibility.** The anon key is
-  used for both reads and writes today. This is only safe if RLS policies
-  on `projects` actually restrict the anon role — this repo doesn't contain
-  that policy definition, and it hasn't been verified in any sprint so far.
-  Treat this as an open item, not as "handled because Supabase is generally
-  safe."
+- **Supabase security is a database-layer responsibility.** As of
+  Milestone 27c, `projects` has RLS enabled with explicit `select`/`insert`
+  policies keyed to `auth.uid() = owner_id` (`supabase/migrations/`),
+  plus a `references auth.users(id)` foreign key on `owner_id` — no
+  longer an open, unverified item for that table specifically. This only
+  holds as long as every query against `projects` goes through a
+  session-aware client (`lib/supabase/server.ts`), never the deprecated,
+  anon-key-only `lib/supabase.ts` — a client with no per-request identity
+  makes `auth.uid()` resolve to nothing, silently returning zero rows for
+  everyone rather than enforcing anything. Any future table added to this
+  database inherits the same requirement and starts from the same
+  "unverified until proven otherwise" assumption.
 - **OpenAI calls happen server-side only.** `OPENAI_API_KEY` is never read
   in a `"use client"` file or exposed in a response payload — always
   through `lib/services/openai.ts`.
@@ -623,6 +634,18 @@ tokens already do this on `components/ui/` — don't override them away).
   send an arbitrarily large message or loop the route to drive OpenAI
   spend. This is an open item (Milestone 6); don't add a new unauthenticated
   endpoint with the same gap without flagging it.
+- **Analysis session ids are sequential and guessable, not cryptographically
+  random** (`lib/analysis-session/utils/id.ts`'s `nextSessionId()`:
+  `` `session_${Date.now()}_${counter}` ``). Since `/api/analysis-sessions/[id]`
+  and its `cancel`/`retry` siblings are deliberately public (anonymous
+  users may run and view an analysis — Milestone 27's approved product
+  decision), anyone who can guess or enumerate a nearby id can read,
+  cancel, or retry a session they didn't start. Named explicitly as an
+  open hardening task at Milestone 27c's own review, deliberately not
+  fixed there or by any milestone since — fixing it means either
+  switching to an unguessable id scheme or gating those routes (the
+  latter contradicts the anonymous-analysis decision), a call for
+  whoever picks this up next.
 
 ---
 

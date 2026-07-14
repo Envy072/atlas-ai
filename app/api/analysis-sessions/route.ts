@@ -1,4 +1,5 @@
 import { startAnalysisSession, CreateSessionInputSchema } from "@/lib/services/analysisSessions";
+import { getCurrentUser } from "@/lib/services/auth";
 import { jsonSuccess, jsonError } from "@/lib/api/response";
 import { InvalidRequestError } from "@/lib/errors";
 
@@ -10,6 +11,13 @@ import { InvalidRequestError } from "@/lib/errors";
 // (502, per lib/errors/AppError.ts) is reserved for a response that
 // doesn't match an expected shape (an AI/upstream output), not for
 // rejecting a malformed request body.
+//
+// Stays fully public — anonymous users may run an analysis (Milestone
+// 27's approved product decision, re-confirmed at Milestone 27b/27c).
+// getCurrentUser() is called only to *read* identity, never to require
+// it: a null result is passed straight through, and
+// startAnalysisSession/persistProjectFromSession already treat a null
+// user id as "don't persist," not as an error.
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -19,7 +27,8 @@ export async function POST(req: Request) {
       throw new InvalidRequestError("A valid startupIdea is required to start an analysis.");
     }
 
-    const view = await startAnalysisSession(parsed.data);
+    const user = await getCurrentUser();
+    const view = await startAnalysisSession(parsed.data, user?.id ?? null);
 
     return jsonSuccess(view, 201);
   } catch (error) {
