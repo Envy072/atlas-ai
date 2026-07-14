@@ -1,22 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { getSafeRedirectPath } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import Logo from "@/components/shared/Logo";
 
-// TEMPORARY development/testing page (MILESTONE_27_DESIGN.md /
-// Milestone 27a scope) — not final product UI. Exists only to exercise
-// sign-in/sign-out end to end while Supabase Auth is wired up. No route
-// is protected yet (Milestone 27b), so nothing links here from the real
-// product surface today.
+// Real sign-in page (MILESTONE_28_DESIGN.md Deliverable 6) — no longer
+// a temporary test page. middleware.ts already redirects an
+// already-authenticated visitor away from this route before it ever
+// renders (Deliverable 8b); the "already signed in" branch below is a
+// client-side safety net for the one case that survives that (e.g.
+// signing in from a second tab while this one is still open), not the
+// primary path.
+//
+// useSearchParams() requires a Suspense boundary in the App Router —
+// LoginForm is split out so that requirement doesn't force this whole
+// page into an unnecessarily different rendering mode.
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   const [user, setUser] = useState<User | null>(null);
@@ -53,7 +70,11 @@ export default function LoginPage() {
       return;
     }
 
-    router.refresh();
+    // getSafeRedirectPath rejects anything that isn't a genuine,
+    // same-origin relative path — an absolute or protocol-relative
+    // redirectTo falls back to /dashboard instead (MILESTONE_28_DESIGN.md
+    // Section 9).
+    router.push(getSafeRedirectPath(searchParams.get("redirectTo"), "/dashboard"));
   }
 
   async function handleSignOut() {
@@ -70,11 +91,9 @@ export default function LoginPage() {
   return (
     <div className="mx-auto flex min-h-screen max-w-sm items-center p-6">
       <Card className="w-full space-y-6 p-8">
-        <div>
-          <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-            Temporary test page — Milestone 27a
-          </p>
-          <h1 className="mt-1 text-2xl font-bold text-card-foreground">Log in</h1>
+        <div className="flex flex-col items-center gap-4 text-center">
+          <Logo />
+          <h1 className="text-2xl font-bold text-card-foreground">Log in</h1>
         </div>
 
         {user ? (

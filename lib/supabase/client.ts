@@ -1,10 +1,11 @@
 import { createBrowserClient } from "@supabase/ssr";
 
-// Browser-side Supabase client — used only by the temporary /login and
-// /signup pages (MILESTONE_27_DESIGN.md Section 3.8) for their own
-// signInWithPassword/signUp/signOut calls. Nothing else should import
-// this: every actual data read/write still goes through this app's own
-// API routes/Server Components, exactly as before this milestone.
+// Browser-side Supabase client — used by /login and /signup
+// (MILESTONE_27_DESIGN.md Section 3.8) for their own
+// signInWithPassword/signUp calls, and by ProfileMenu
+// (MILESTONE_28_DESIGN.md Deliverable 2) for signOut(). Nothing else
+// should import this: every actual data read/write still goes through
+// this app's own API routes/Server Components.
 //
 // A separate file from the old lib/supabase.ts anon-key client, which
 // is now deprecated and unused: lib/services/projects.ts switched to

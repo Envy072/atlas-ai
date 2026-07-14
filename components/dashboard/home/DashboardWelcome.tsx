@@ -2,15 +2,21 @@ import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// The welcome section + primary CTA. Name is hardcoded ("Yasin"),
-// consistent with the rest of the app today — there's no auth/session
-// model yet (CLAUDE.md Roadmap Milestone 4).
+interface DashboardWelcomeProps {
+  displayName: string;
+}
+
+// The welcome section + primary CTA. Greets the real signed-in user
+// (MILESTONE_28_DESIGN.md Deliverable 3), by the same
+// formatDisplayName()-derived name shown in ProfileMenu — one shared
+// derivation, computed once by this component's caller, never
+// re-implemented here.
 //
 // The gradient (from-primary via-indigo-600 to-purple-700) is a deliberate
 // exception to "avoid raw Tailwind colors": it's a decorative, multi-stop
 // hero treatment, not a semantically-meaningful surface, and indigo/purple
 // don't have (or need) their own design tokens — see DESIGN_SYSTEM.md.
-export default function DashboardWelcome() {
+export default function DashboardWelcome({ displayName }: DashboardWelcomeProps) {
   return (
     <section className="flex flex-col gap-6 rounded-3xl bg-gradient-to-r from-primary via-indigo-600 to-purple-700 p-8 text-white shadow-lg md:flex-row md:items-center md:justify-between">
       <div>
@@ -19,7 +25,7 @@ export default function DashboardWelcome() {
           Welcome back
         </div>
 
-        <h1 className="text-3xl font-bold tracking-tight">Good to see you, Yasin</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Good to see you, {displayName}</h1>
 
         <p className="mt-2 max-w-xl leading-7 text-white/80">
           Describe your next startup idea and Atlas AI will stress-test it like an

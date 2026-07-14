@@ -812,10 +812,12 @@ project detail route. Make dashboard search functional. Replace the static
 stub pages (`/pricing`, `/reports`, `/research`, `/settings`) as each
 becomes a priority.
 
-**Milestone 4 — Authentication & multi-tenancy.** A real `lib/services/
-auth.ts` session model, replacing the hardcoded "Yasin / Founder" identity.
-Every project gains an owner; user-specific routes gate behind a real
-session check.
+**Milestone 4 — Authentication & multi-tenancy.** ✅ **Complete**, delivered
+across Milestones 27a–28: a real `lib/services/auth.ts` session model
+(27a); every project gains an owner, enforced by RLS, not just an
+unused column (27c); user-specific routes gate behind a real session
+check (27b); and the hardcoded "Yasin / Founder" identity is replaced
+with the real signed-in user throughout the dashboard shell (28).
 
 **Milestone 5 — Billing.** `lib/services/stripe.ts` plus a
 pricing/subscription model — checkout, plan tiers, usage limits tied to a

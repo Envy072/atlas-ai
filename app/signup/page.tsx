@@ -1,19 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getSafeRedirectPath } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import Logo from "@/components/shared/Logo";
 
-// TEMPORARY development/testing page (MILESTONE_27_DESIGN.md /
-// Milestone 27a scope) — not final product UI. Exists only to exercise
-// sign-up end to end while Supabase Auth is wired up. No route is
-// protected yet (Milestone 27b), so nothing links here from the real
-// product surface today.
+// Real sign-up page (MILESTONE_28_DESIGN.md Deliverable 7) — no longer
+// a temporary test page. middleware.ts already redirects an
+// already-authenticated visitor away from this route before it ever
+// renders (Deliverable 8b).
+//
+// useSearchParams() requires a Suspense boundary in the App Router —
+// SignupForm is split out for the same reason as /login.
 export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
+  );
+}
+
+function SignupForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   const [email, setEmail] = useState("");
@@ -40,22 +55,23 @@ export default function SignupPage() {
     // Whether this account can sign in immediately or needs email
     // confirmation first depends on the Supabase project's own Auth
     // settings (outside this codebase's control) — session is non-null
-    // only when confirmation isn't required.
-    setMessage(
-      data.session
-        ? "Account created — you're signed in."
-        : "Account created — check your email to confirm before signing in."
-    );
+    // only when confirmation isn't required. Only navigate away in
+    // that case; otherwise the "check your email" message is the only
+    // thing to show, unchanged from before this milestone.
+    if (data.session) {
+      router.push(getSafeRedirectPath(searchParams.get("redirectTo"), "/dashboard"));
+      return;
+    }
+
+    setMessage("Account created — check your email to confirm before signing in.");
   }
 
   return (
     <div className="mx-auto flex min-h-screen max-w-sm items-center p-6">
       <Card className="w-full space-y-6 p-8">
-        <div>
-          <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-            Temporary test page — Milestone 27a
-          </p>
-          <h1 className="mt-1 text-2xl font-bold text-card-foreground">Sign up</h1>
+        <div className="flex flex-col items-center gap-4 text-center">
+          <Logo />
+          <h1 className="text-2xl font-bold text-card-foreground">Sign up</h1>
         </div>
 
         <form onSubmit={handleSignUp} className="space-y-4">

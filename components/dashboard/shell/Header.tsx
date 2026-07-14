@@ -3,13 +3,14 @@
 import { Menu as MenuIcon, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import NotificationsMenu from "@/components/dashboard/shell/NotificationsMenu";
-import ProfileMenu from "@/components/dashboard/shell/ProfileMenu";
+import ProfileMenu, { type ProfileMenuUser } from "@/components/dashboard/shell/ProfileMenu";
 
 interface HeaderProps {
   onOpenMobileMenu: () => void;
+  user: ProfileMenuUser | null;
 }
 
-export default function Header({ onOpenMobileMenu }: HeaderProps) {
+export default function Header({ onOpenMobileMenu, user }: HeaderProps) {
   return (
     <header className="flex h-16 shrink-0 items-center gap-4 border-b border-border bg-background px-4 md:px-6">
       <button
@@ -33,7 +34,7 @@ export default function Header({ onOpenMobileMenu }: HeaderProps) {
 
       <div className="ml-auto flex items-center gap-2">
         <NotificationsMenu />
-        <ProfileMenu />
+        <ProfileMenu user={user} />
       </div>
     </header>
   );

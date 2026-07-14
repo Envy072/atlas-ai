@@ -10,6 +10,11 @@ import { type NextRequest, NextResponse } from "next/server";
 // oversight.
 const PROTECTED_PATHS = new Set(["/dashboard", "/projects", "/settings"]);
 
+// The symmetric case (MILESTONE_28_DESIGN.md Deliverable 8b): an
+// already-authenticated visitor gets no reason to see the sign-in/
+// sign-up forms at all.
+const AUTH_PATHS = new Set(["/login", "/signup"]);
+
 // Session refresh (MILESTONE_27_DESIGN.md Section 3.5, unchanged since
 // Milestone 27a) plus page-route redirects (Milestone 27b) — the two
 // responsibilities this file was always designed to own. Still the
@@ -57,7 +62,18 @@ export async function middleware(request: NextRequest) {
 
   if (!user && PROTECTED_PATHS.has(request.nextUrl.pathname)) {
     const loginUrl = new URL("/login", request.url);
+    // Safe to attach unvalidated: this value is constructed here from
+    // Next's own request.nextUrl.pathname, never from caller-controlled
+    // input — the untrusted side of this mechanism is /login and
+    // /signup reading it back out of the query string, which is why
+    // the validation (lib/format.ts's getSafeRedirectPath) lives there,
+    // not here (MILESTONE_28_DESIGN.md Deliverable 8a).
+    loginUrl.searchParams.set("redirectTo", request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (user && AUTH_PATHS.has(request.nextUrl.pathname)) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return response;

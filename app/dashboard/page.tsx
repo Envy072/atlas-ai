@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { listProjects } from "@/lib/services/projects";
 import { getCurrentUser } from "@/lib/services/auth";
+import { formatDisplayName } from "@/lib/format";
 import DashboardHome from "@/components/dashboard/home/DashboardHome";
 
 // Already protected by middleware.ts (Milestone 27b) — this check
@@ -16,5 +17,5 @@ export default async function DashboardPage() {
 
   const projects = await listProjects(user.id);
 
-  return <DashboardHome projects={projects} />;
+  return <DashboardHome projects={projects} displayName={formatDisplayName(user.email ?? "")} />;
 }
