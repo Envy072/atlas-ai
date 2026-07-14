@@ -18,9 +18,11 @@ export default function Navbar() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <Button variant="ghost">Sign In</Button>
+          <Button variant="ghost" render={<Link href="/login" />}>
+            Sign In
+          </Button>
 
-          <Button>
+          <Button render={<Link href="/dashboard/analysis" />}>
             Get Started
           </Button>
         </div>

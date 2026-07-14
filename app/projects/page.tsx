@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { FolderKanban } from "lucide-react";
+import Link from "next/link";
+import { FolderKanban, SearchX } from "lucide-react";
 import { listProjects } from "@/lib/services/projects";
 import { getCurrentUser } from "@/lib/services/auth";
 import { formatPercent } from "@/lib/format";
@@ -21,24 +22,59 @@ import EmptyState from "@/components/shared/EmptyState";
 // (Milestone 27c) supplies the real user id listProjects() now requires
 // and scopes every returned project to that user, never assumed
 // present just because middleware ran.
-export default async function ProjectsPage() {
+interface ProjectsPageProps {
+  searchParams: Promise<{ q?: string }>;
+}
+
+// `?q=` search (MILESTONE_29_DESIGN.md Deliverable 6), submitted by
+// Header's search form. A plain, in-memory, case-insensitive substring
+// match over this user's own already-fetched projects — no new query
+// shape, no new service function; consistent with the "measure before
+// optimizing" rule (CLAUDE.md Section 15), since this list is the same
+// small, per-user set listProjects() always returns.
+export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
   const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
   }
 
-  const projects = await listProjects(user.id);
+  const { q } = await searchParams;
+  const allProjects = await listProjects(user.id);
+  const projects = q
+    ? allProjects.filter((project) => project.title.toLowerCase().includes(q.toLowerCase()))
+    : allProjects;
 
   return (
     <div className="mx-auto max-w-5xl p-8">
-      <H1 className="mb-8">Projects</H1>
+      <div className="mb-8">
+        <H1>Projects</H1>
+        {q && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            Showing results for &ldquo;{q}&rdquo; ·{" "}
+            <Link href="/projects" className="font-medium text-primary hover:underline">
+              Clear
+            </Link>
+          </p>
+        )}
+      </div>
 
       {projects.length === 0 ? (
         <Card>
           <EmptyState
-            icon={FolderKanban}
-            title="No projects yet"
-            description="Every startup idea you analyze is saved here, most recent first."
+            icon={q ? SearchX : FolderKanban}
+            title={q ? `No projects match "${q}"` : "No projects yet"}
+            description={
+              q
+                ? "Try a different search term."
+                : "Every startup idea you analyze is saved here, most recent first."
+            }
+            action={
+              q ? (
+                <Link href="/projects" className="text-sm font-medium text-primary hover:underline">
+                  Clear search
+                </Link>
+              ) : undefined
+            }
           />
         </Card>
       ) : (
@@ -47,40 +83,39 @@ export default async function ProjectsPage() {
             const { businessSummary, confidenceSummary } = project.profile;
 
             return (
-              <Card
-                key={project.id}
-                className="p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <div className="mb-4 flex items-center justify-between gap-4">
-                  <h2 className="text-2xl font-bold tracking-tight text-card-foreground">
-                    {project.title}
-                  </h2>
+              <Link key={project.id} href={`/projects/${project.id}`} className="block">
+                <Card className="p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+                  <div className="mb-4 flex items-center justify-between gap-4">
+                    <h2 className="text-2xl font-bold tracking-tight text-card-foreground">
+                      {project.title}
+                    </h2>
 
-                  <Badge variant="secondary">
-                    Confidence {formatPercent(Math.round(confidenceSummary.evidenceConfidence))}
-                  </Badge>
-                </div>
-
-                <Body className="mb-6 text-muted-foreground">
-                  {businessSummary.valueProposition ?? businessSummary.businessModel ?? "No summary available."}
-                </Body>
-
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div>
-                    <Small className="mb-2 block text-muted-foreground">Problem</Small>
-                    <p className="leading-7 text-card-foreground">
-                      {businessSummary.customerProblem ?? "Not yet known."}
-                    </p>
+                    <Badge variant="secondary">
+                      Confidence {formatPercent(Math.round(confidenceSummary.evidenceConfidence))}
+                    </Badge>
                   </div>
 
-                  <div>
-                    <Small className="mb-2 block text-muted-foreground">Solution</Small>
-                    <p className="leading-7 text-card-foreground">
-                      {businessSummary.valueProposition ?? "Not yet known."}
-                    </p>
+                  <Body className="mb-6 text-muted-foreground">
+                    {businessSummary.valueProposition ?? businessSummary.businessModel ?? "No summary available."}
+                  </Body>
+
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div>
+                      <Small className="mb-2 block text-muted-foreground">Problem</Small>
+                      <p className="leading-7 text-card-foreground">
+                        {businessSummary.customerProblem ?? "Not yet known."}
+                      </p>
+                    </div>
+
+                    <div>
+                      <Small className="mb-2 block text-muted-foreground">Solution</Small>
+                      <p className="leading-7 text-card-foreground">
+                        {businessSummary.valueProposition ?? "Not yet known."}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
+              </Link>
             );
           })}
         </div>

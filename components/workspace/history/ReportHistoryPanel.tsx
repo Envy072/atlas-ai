@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { FolderClock, FileSearch } from "lucide-react";
 import type { Project } from "@/lib/schemas/project";
 import { formatRelativeTime, formatPercent } from "@/lib/format";
@@ -15,11 +16,10 @@ const MAX_VISIBLE = 8;
 
 // Real data via the existing, unmodified services/projects.listProjects()
 // — the same source Dashboard Home's Recent Projects panel already uses.
-// Selecting an item only highlights it and shows its (real) headline facts
-// here; there's no historical-report *viewer* yet (that would mean safely
-// re-validating a stored row back into a full AnalysisResult, which is
-// deliberately out of scope — see DASHBOARD.md/PIPELINE.md's pattern of
-// keeping real features real rather than half-building them).
+// Selecting an item highlights it and shows its (real) headline facts
+// here, with a link into the full report at app/projects/[id]
+// (MILESTONE_29_DESIGN.md Deliverable 5) — the project detail route
+// added in Milestone 29.
 export default function ReportHistoryPanel({ projects }: ReportHistoryPanelProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const recent = projects.slice(0, MAX_VISIBLE);
@@ -82,9 +82,12 @@ export default function ReportHistoryPanel({ projects }: ReportHistoryPanelProps
                 <p className="mt-1 truncate text-sm font-medium text-card-foreground">
                   {selected.title ?? "Untitled idea"}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Full historical report viewing is coming soon.
-                </p>
+                <Link
+                  href={`/projects/${selected.id}`}
+                  className="mt-1 inline-block text-xs font-medium text-primary hover:underline"
+                >
+                  View full report →
+                </Link>
               </div>
             ) : (
               <div className="flex items-start gap-2">

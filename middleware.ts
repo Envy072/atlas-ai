@@ -5,10 +5,12 @@ import { type NextRequest, NextResponse } from "next/server";
 // NOT also match /dashboard/analysis, which stays public per the
 // approved anonymous-analysis product decision (MILESTONE_27_DESIGN.md
 // Section 3.11; re-confirmed and scoped precisely at Milestone 27b).
-// /research, /reports, /competitors, /templates are deliberately absent
-// — left untouched per that same milestone's Finding 2, not an
-// oversight.
-const PROTECTED_PATHS = new Set(["/dashboard", "/projects", "/settings"]);
+// /research, /reports, /templates are deliberately absent — left
+// untouched per that same milestone's Finding 2, not an oversight.
+// /competitors was in that same "left untouched" group until Milestone
+// 29 gave it real, user-owned data to protect (MILESTONE_29_DESIGN.md
+// Deliverable 10) — it no longer belongs in that group.
+const PROTECTED_PATHS = new Set(["/dashboard", "/projects", "/settings", "/competitors"]);
 
 // The symmetric case (MILESTONE_28_DESIGN.md Deliverable 8b): an
 // already-authenticated visitor gets no reason to see the sign-in/

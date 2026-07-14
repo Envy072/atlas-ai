@@ -84,6 +84,43 @@ export async function listProjects(userId: string): Promise<Project[]> {
     .filter((project): project is Project => project !== null);
 }
 
+// The single-row counterpart to listProjects, for app/projects/[id]
+// (MILESTONE_29_DESIGN.md Deliverable 2/3). The .eq("id", ...)
+// .eq("owner_id", ...) pair is deliberate, not redundant: RLS's
+// projects_select_own policy already prevents a non-owner's query from
+// returning a row at the database level, but this file's own
+// convention (CLAUDE.md Section 16) is to enforce the same rule at the
+// application layer too, independently — neither layer replaces the
+// other.
+//
+// A missing row, a malformed row, and a row owned by someone else are
+// all indistinguishable `null` results here, on purpose: the caller
+// must not be able to tell those three cases apart, so a guessed or
+// enumerated id never reveals whether it belongs to someone else vs.
+// not existing at all (MILESTONE_29_DESIGN.md Section 9,
+// "Enumeration resistance").
+export async function getProjectById(id: string, userId: string): Promise<Project | null> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("id", id)
+    .eq("owner_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Supabase Error:", error);
+    return null;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return fromRow(data as ProjectRow);
+}
+
 // The one and only write path for the `projects` table
 // (MILESTONE_26_DESIGN.md Section 3.5). Called from
 // lib/services/analysisSessions.ts's session-view composition — the

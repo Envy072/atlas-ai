@@ -30,7 +30,14 @@ const CATEGORY_LABEL: Record<CompetitorCategory, string> = {
 // per-strength/per-weakness evidence link, only one evidence list for the
 // whole profile, so this never fabricates a more granular pairing than
 // the data actually supports.
-function CompetitorSubCard({ competitor }: { competitor: CompanyProfile }) {
+//
+// Exported (MILESTONE_29_DESIGN.md Deliverable 1) so app/competitors's
+// aggregation view can reuse this exact rendering for a single
+// CompanyProfile rather than re-implementing it a second time — that
+// page just wraps this with a "Mentioned in" annotation, which is
+// aggregation-specific context this component deliberately knows
+// nothing about.
+export function CompetitorSubCard({ competitor }: { competitor: CompanyProfile }) {
   const hasPricing = Boolean(competitor.pricing);
   const hasStrengthsOrWeaknesses = competitor.strengths.length > 0 || competitor.weaknesses.length > 0;
 

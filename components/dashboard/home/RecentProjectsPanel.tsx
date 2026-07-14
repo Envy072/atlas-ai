@@ -13,9 +13,8 @@ interface RecentProjectsPanelProps {
 const MAX_VISIBLE = 5;
 
 // Real data from services/projects.listProjects() — no fabricated demo
-// projects. Rows aren't links yet: there's no project detail route
-// (app/projects/[id]) in this app today, so linking each row would 404.
-// See DASHBOARD.md's Future Extension Points.
+// projects. Each row links to app/projects/[id] (MILESTONE_29_DESIGN.md
+// Deliverable 4), the project detail route added in Milestone 29.
 export default function RecentProjectsPanel({ projects }: RecentProjectsPanelProps) {
   const recent = projects.slice(0, MAX_VISIBLE);
 
@@ -49,8 +48,9 @@ export default function RecentProjectsPanel({ projects }: RecentProjectsPanelPro
             const { businessSummary, confidenceSummary } = project.profile;
 
             return (
-              <div
+              <Link
                 key={project.id}
+                href={`/projects/${project.id}`}
                 className="flex items-center justify-between gap-4 p-5 transition-colors duration-150 hover:bg-muted/40"
               >
                 <div className="min-w-0">
@@ -68,7 +68,7 @@ export default function RecentProjectsPanel({ projects }: RecentProjectsPanelPro
                     {formatRelativeTime(project.createdAt)}
                   </span>
                 </div>
-              </div>
+              </Link>
             );
           })
         )}
