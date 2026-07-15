@@ -735,7 +735,17 @@ until the sequential pipeline is actually observed to be a bottleneck.
   the full suite — fixed with an explicit `testTimeout: 30_000` in
   `vitest.config.ts` rather than left as a borderline default that
   would have made CI flaky in exactly the way this section warns
-  against.
+  against. A third, real source surfaced only once a genuine GitHub
+  Actions run happened (not reproducible by local testing alone,
+  underscoring why Acceptance Criterion 8's live-PR check matters):
+  `formatCurrencyUsd`'s `Intl.NumberFormat` compact-notation output for
+  a sub-1000 value (no K/M/B suffix) differs by Node/ICU version —
+  `$500` on this machine's Node, `$500.0` on the CI runner's. Fixed by
+  loosening `lib/format.test.ts`'s assertion for that one case to
+  accept either rendering (`toMatch(/^\$500(\.0)?$/)`) rather than
+  hardcoding one environment's output — the million/billion cases are
+  unaffected, since compact notation always carries a fractional digit
+  once a K/M/B suffix actually applies.
 - **Maintenance cost.** Every new test is a small, real cost to keep
   green as the code it covers changes — mitigated by keeping this
   milestone's scope to a representative, high-leverage slice (Section
