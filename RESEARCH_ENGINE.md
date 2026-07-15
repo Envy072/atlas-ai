@@ -6,12 +6,22 @@ Atlas AI gather real evidence (search results, competitor data, news,
 code activity) before running an analysis, instead of relying purely on
 the model's own knowledge.
 
-**Status: not wired into the application.** Nothing in `lib/analysis/`,
-`lib/services/`, `app/api/`, `lib/store/`, or `lib/schemas/` imports from
-`lib/research/` — those five paths are frozen this milestone and remain
-completely unchanged. `lib/research/` is free-standing, real, and
-independently verified (see "Verification" below), waiting for a future
-milestone to decide how it plugs into the existing Analysis Pipeline.
+**Status (updated, Milestone 32): wired into the application.** This
+section originally read "not wired into the application" — accurate at
+the time it was written, before the six knowledge platforms existed.
+Direct audit during Milestone 32 (`MILESTONE_32_DESIGN.md` Section 5.3)
+confirms `runResearch()` is called by six real, independent sites:
+`lib/pipeline/stages/research.ts` (the pipeline's own research stage)
+and each of the five knowledge platforms' own discovery functions
+(`lib/financial/knowledge/financialDiscovery.ts`,
+`lib/business/knowledge/businessDiscovery.ts`,
+`lib/market/knowledge/marketDiscovery.ts`,
+`lib/competitors/discovery/competitorDiscovery.ts`,
+`lib/decision/engine/decisionEngine.ts`). `lib/research/` is real and
+independently verified (see "Verification" below), and — as of
+Milestone 32 — three of its seven providers (Tavily, Brave, Crunchbase)
+make real, credentialed calls in place of the honest placeholders this
+document originally described.
 
 ---
 

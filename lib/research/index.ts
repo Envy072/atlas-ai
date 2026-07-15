@@ -1,7 +1,12 @@
-// Public entry point for the Research Engine. Nothing outside
-// lib/research/ imports from this yet — see RESEARCH_ENGINE.md /
-// PROVIDER_MANAGER.md's Future Integration Plan for how a later
-// milestone wires this in.
+// Public entry point for the Research Engine. runResearch() is called
+// by lib/pipeline/stages/research.ts (the pipeline's own research
+// stage) and by each of the five knowledge platforms' own discovery
+// functions (lib/financial/knowledge/financialDiscovery.ts,
+// lib/business/knowledge/businessDiscovery.ts,
+// lib/market/knowledge/marketDiscovery.ts,
+// lib/competitors/discovery/competitorDiscovery.ts,
+// lib/decision/engine/decisionEngine.ts) — confirmed live, not planned
+// (MILESTONE_32_DESIGN.md Section 5.3).
 export { runResearch } from "@/lib/research/orchestrator/researchOrchestrator";
 export { selectProviders } from "@/lib/research/orchestrator/providerSelector";
 export { searchViaProviderManager } from "@/lib/research/manager/providerManager";
