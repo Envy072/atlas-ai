@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least-privilege default (MILESTONE_30_DESIGN.md Deliverable 9,
+# Security Review) — this pipeline only reads the repo and reports a
+# check status; it never pushes, comments, or writes anything.
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint, type-check, test, build
+    runs-on: ubuntu-latest
+    # Every env value below is an obviously-non-functional placeholder,
+    # not a real secret (MILESTONE_30_DESIGN.md Security Review) — no
+    # test in this suite makes a real network call, and
+    # NEXT_PUBLIC_SUPABASE_URL uses the IANA-reserved .invalid TLD
+    # (RFC 2606), guaranteed to never resolve, unlike a subdomain of a
+    # real, live domain.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.invalid"
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-not-a-real-key"
+      OPENAI_API_KEY: "placeholder-not-a-real-key"
+      BRAVE_API_KEY: "placeholder-not-a-real-key"
+      TAVILY_API_KEY: "placeholder-not-a-real-key"
+      CI: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Test (with coverage)
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build

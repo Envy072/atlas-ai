@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vitest's coverage report (MILESTONE_30_DESIGN.md) — a generated,
+    // gitignored artifact, not source, same treatment as the four
+    // above.
+    "coverage/**",
   ]),
 ]);
 

@@ -36,7 +36,7 @@ export default function Testimonials() {
               className="rounded-3xl border p-8 shadow-sm"
             >
               <p className="text-gray-600 italic">
-                "{user.text}"
+                &quot;{user.text}&quot;
               </p>
 
               <div className="mt-8">

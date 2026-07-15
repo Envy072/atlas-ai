@@ -275,6 +275,16 @@ the mechanism, not the contract.
 **`public/`** — static assets served as-is. Never: anything the build
 should process (co-locate with its component, or use `next/image`).
 
+**`tests/`** — shared test infrastructure only: `fixtures/`
+(schema-valid synthetic builders, e.g. `buildProjectFixture`),
+`mocks/` (hand-rolled test doubles, e.g. the Supabase client mock),
+and `integration/` (multi-file flow tests spanning a route → service →
+store, with no single natural home among them). A unit test for one
+file lives *next to* that file instead (`lib/format.ts` +
+`lib/format.test.ts`), not here — `tests/` holds infrastructure and
+tests that genuinely don't belong to a single source file. See
+`TESTING.md`. Never: product code of any kind.
+
 ---
 
 ## 5. TypeScript Rules
@@ -829,10 +839,20 @@ responses (the unused `ai` dependency exists for this). Route-level
 `error.tsx`/`loading.tsx`. Retry/backoff for transient OpenAI/Supabase
 failures.
 
-**Milestone 7 — Testing & CI/CD.** Unit tests for services (most valuable
-to test — framework-agnostic, easiest to mock), integration tests for API
-routes, end-to-end tests for the golden path. A CI pipeline blocking merges
-on failure, plus preview deployments for pull requests.
+**Milestone 7 — Testing & CI/CD.** ✅ **Delivered** (Milestone 30): a real
+Vitest test suite — unit tests for the cross-cutting utilities and the
+services layer (most valuable to test — framework-agnostic, easiest to
+mock), a representative knowledge-platform test
+(`lib/decision/confidence/`), and one full integration test against the
+real `/api/analysis-sessions` route family — plus a GitHub Actions CI
+pipeline (`.github/workflows/ci.yml`) blocking on lint/type-check/test/
+build failure, on every push and pull request. See
+`MILESTONE_30_DESIGN.md` and `TESTING.md`. **Not** delivered by this
+milestone, named explicitly rather than silently dropped: end-to-end
+tests for the golden path, preview deployments for pull requests, and
+exhaustive unit coverage across the other five knowledge platforms
+(`lib/decision`'s confidence engine is the proven template for that
+follow-up) — each real, separately-scoped work.
 
 ---
 
