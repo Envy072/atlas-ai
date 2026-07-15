@@ -27,6 +27,7 @@ jobs:
       OPENAI_API_KEY: "placeholder-not-a-real-key"
       BRAVE_API_KEY: "placeholder-not-a-real-key"
       TAVILY_API_KEY: "placeholder-not-a-real-key"
+      CRUNCHBASE_API_KEY: "placeholder-not-a-real-key"
       CI: "true"
     steps:
       - name: Checkout
