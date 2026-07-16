@@ -393,7 +393,12 @@ prompt is the product's core IP — treat changes to it as a product
 decision, reviewed as carefully as pricing. Callers never supply their own
 prompt or model name; each real generation milestone (35–37) adds its own
 export to this same file, behind its own signature, never its own OpenAI
-client construction elsewhere.
+client construction elsewhere. As of Milestone 35, this file exports a
+second, sibling function of the same shape,
+`generateCandidateRisks(startupIdea, evidence): Promise<CandidateRisk[]>`
+— structurally identical to `generateCandidateFindings()` (same evidence
+selection, same SDK call shape, same error handling), differing only in
+its schema and its own risk-specific system prompt.
 
 **Analysis service** (`analysis.ts`) — named here since Milestone 1,
 deleted alongside `openai.ts` at Milestone 25 as part of the same retired

@@ -9,7 +9,7 @@ import type { DecisionContext } from "@/lib/decision/schemas/context.schema";
 import type { BusinessSummary } from "@/lib/decision/schemas/businessSummary.schema";
 import { deriveEmptyThesis } from "@/lib/decision/thesis/investmentThesis";
 import type { Finding } from "@/lib/decision/schemas/finding.schema";
-import { deriveCriticalRisks } from "@/lib/decision/redflags/riskFinding";
+import type { RiskFinding } from "@/lib/decision/schemas/riskFinding.schema";
 import { deriveDecisionReadiness } from "@/lib/decision/readiness/decisionReadiness";
 import { computeDecisionConfidence } from "@/lib/decision/confidence/decisionConfidence";
 import type { CoverageChecklist } from "@/lib/decision/types/confidence";
@@ -94,6 +94,13 @@ export interface BuildDecisionProfileInput {
   // sites) are unaffected by this milestone (MILESTONE_34_DESIGN.md
   // Section 5).
   findings?: Finding[];
+  // Milestone 35, additive — real, evidence-constrained critical risks
+  // computed by the caller via deriveCriticalRisks() (now async, for
+  // the identical reason findings above is), passed in here already
+  // computed. Resolves the asymmetry Milestone 34 named and predicted:
+  // buildDecisionProfile() now computes zero fields inline for either
+  // findings or critical risks (MILESTONE_35_DESIGN.md Section 5).
+  criticalRisks?: RiskFinding[];
   now?: Date;
 }
 
@@ -111,7 +118,7 @@ export function buildDecisionProfile(input: BuildDecisionProfileInput): Decision
   const keyCompetitors = input.keyCompetitors ?? [];
 
   const findings = input.findings ?? [];
-  const criticalRisks = deriveCriticalRisks();
+  const criticalRisks = input.criticalRisks ?? [];
 
   const checklist: CoverageChecklist = {
     hasBusinessModel: Boolean(input.businessSummary.businessModel),

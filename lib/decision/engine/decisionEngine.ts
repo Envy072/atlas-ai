@@ -11,6 +11,7 @@ import { DecisionSynthesisResultSchema } from "@/lib/decision/schemas/discovery.
 import { buildDecisionProfile } from "@/lib/decision/engine/decisionProfileBuilder";
 import { aggregateEvidence } from "@/lib/decision/evidence/evidenceAggregator";
 import { deriveFindings } from "@/lib/decision/findings/findingBuilder";
+import { deriveCriticalRisks } from "@/lib/decision/redflags/riskFinding";
 import { parseOrThrow } from "@/lib/validation/parse";
 
 // Frames the startup idea as a decision-synthesis query — a deliberately
@@ -99,6 +100,13 @@ export async function synthesizeDecision(
   // introduces at this layer (MILESTONE_34_DESIGN.md Section 5).
   const findings = await deriveFindings(request.startupIdea, aggregated.evidence);
 
+  // Milestone 35: real, evidence-constrained critical risk generation —
+  // the identical async-migration pattern deriveFindings() above
+  // already uses, applied to deriveCriticalRisks() (previously called
+  // inline inside buildDecisionProfile()) (MILESTONE_35_DESIGN.md
+  // Section 5).
+  const criticalRisks = await deriveCriticalRisks(request.startupIdea, aggregated.evidence);
+
   const profile = buildDecisionProfile({
     decisionContext: {
       startupIdea: request.startupIdea,
@@ -148,6 +156,7 @@ export async function synthesizeDecision(
     sources: aggregated.sources,
     evidence: aggregated.evidence,
     findings,
+    criticalRisks,
   });
 
   return parseOrThrow(

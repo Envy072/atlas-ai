@@ -13,7 +13,9 @@ import { SeveritySchema } from "@/lib/market";
 // severity reuses lib/market's own three-level SeveritySchema — the
 // exact scale FindingSchema.severity already reuses — never
 // RiskFindingSchema's four-level RedFlagSeveritySchema, which belongs
-// to a future Milestone 35 candidate-risk shape, not this one.
+// to CandidateRiskSchema's own candidate-risk shape
+// (lib/decision/schemas/candidateRisk.schema.ts, Milestone 35), not
+// this one.
 export const CandidateFindingSchema = CandidateClaimSchema.extend({
   category: FindingCategorySchema,
   severity: SeveritySchema,

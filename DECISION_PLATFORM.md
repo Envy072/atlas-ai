@@ -113,10 +113,14 @@ engine.synthesizeDecision({ startupIdea })
   │     because real generation is async and buildDecisionProfile stays synchronous — see
   │     "Findings" below)
   │
-  └─ engine.buildDecisionProfile({ decisionContext, businessSummary, swot, sources, evidence, findings })
+  ├─ redflags.deriveCriticalRisks(startupIdea, evidence) → RiskFinding[] (REAL as of Milestone 35 —
+  │     evidence-constrained generation via lib/services/openai.ts, gated end to end by
+  │     traceability.verifyClaimTraceability(); called here for the identical reason
+  │     deriveFindings() is — see "Red Flags" below)
+  │
+  └─ engine.buildDecisionProfile({ decisionContext, businessSummary, swot, sources, evidence, findings, criticalRisks })
         │
         ├─ thesis.deriveEmptyThesis()         → investmentThesis (honest, empty)
-        ├─ redflags.deriveCriticalRisks()     → criticalRisks (honest, empty)
         ├─ confidence.computeDecisionConfidence() → confidenceSummary (real, computed)
         ├─ readiness.deriveDecisionReadiness() → decisionReadiness (honest, unassessed)
         │
@@ -170,9 +174,11 @@ metric, and never derives a business strategy — it only:
 1. **Really passes through** already-discovered values (`businessModel`,
    SWOT, `marketIndustry`, `fundingStage`) without altering them.
 2. **Honestly defaults to empty/absent** wherever no real synthesis
-   engine exists yet (`investmentThesis`, `keyFindings`, `criticalRisks`,
+   engine exists yet (`investmentThesis`, `keyFindings`,
    `decisionReadiness` — see each facet's own "architecture only"
-   discipline below), each documented with why.
+   discipline below), each documented with why. `criticalRisks` was
+   part of this list before Milestone 35 — see "Red Flags" below for
+   its own real-generation update.
 3. **Really computes** the few things that are genuinely derivable facts,
    not judgments: `confidenceSummary` (see Confidence Model below) and
    `openQuestions` (a real presence/absence check — e.g. "Value
@@ -236,6 +242,28 @@ needs an escalation tier above "high" ordinary findings don't. **"Evidence-
 backed only" is enforced structurally, not just documented**: the schema
 requires `evidence.length >= 1`. Verified live: constructing a
 `RiskFinding` with an empty evidence array correctly throws.
+
+**Update (Milestone 35): `deriveCriticalRisks()` is real.** It no
+longer returns `[]` unconditionally — it is now `async`, takes
+`(startupIdea, evidence)`, and calls `lib/services/openai.ts`'s
+`generateCandidateRisks()` to produce candidate risks constrained to
+the evidence it was given, using its own risk-specific system prompt
+(distinct from `generateCandidateFindings()`'s own, since a critical
+risk is framed as a reason the idea could fail, not a neutral
+observation). Every candidate is checked by
+`lib/decision/traceability/claimVerifier.ts`'s `verifyClaimTraceability()`
+(Milestone 33, unmodified) before it can become a real `RiskFinding` —
+a candidate citing evidence that doesn't resolve is dropped entirely,
+never surfaced. `verifyClaimTraceability()`'s own "matched" guarantee
+(non-empty `resolvedEvidence`) satisfies `RiskFindingSchema`'s stricter
+`evidence.length >= 1` requirement with no additional check needed. A
+failed generation call, or an empty evidence array, still degrades to
+`[]` — the same honest-empty outcome this platform has always produced
+when it has nothing real to report, now reached via a real attempt
+rather than an unconditional stub. Called from
+`engine/decisionEngine.ts`'s `synthesizeDecision()` (already async),
+not from inside `buildDecisionProfile()` (kept synchronous) — see the
+pipeline diagram above.
 
 ---
 
