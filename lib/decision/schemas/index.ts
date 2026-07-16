@@ -11,3 +11,4 @@ export * from "@/lib/decision/schemas/discovery.schema";
 export * from "@/lib/decision/schemas/memo.schema";
 export * from "@/lib/decision/schemas/diligence.schema";
 export * from "@/lib/decision/schemas/executive.schema";
+export * from "@/lib/decision/schemas/candidateClaim.schema";

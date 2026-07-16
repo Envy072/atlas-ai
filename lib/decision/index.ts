@@ -14,6 +14,7 @@ export { buildFinding, deriveFindings } from "@/lib/decision/findings/findingBui
 export { buildRiskFinding, deriveCriticalRisks } from "@/lib/decision/redflags/riskFinding";
 
 export { aggregateEvidence } from "@/lib/decision/evidence/evidenceAggregator";
+export { verifyClaimTraceability } from "@/lib/decision/traceability/claimVerifier";
 export { computeDecisionConfidence } from "@/lib/decision/confidence/decisionConfidence";
 
 export {
