@@ -406,6 +406,19 @@ differing only in its schema and its own thesis-specific system prompt;
 the shared user-message builder the three exports now use in common was
 consolidated into one function (`buildEvidencePrompt()`) at this same
 milestone, once a third identical copy made the duplication unambiguous.
+As of Milestone 37, this file exports a fourth, final Checkpoint B
+function, `generateCandidateRecommendations(startupIdea, findings,
+criticalRisks, investmentThesis, citableEvidence):
+Promise<CandidateRecommendation[]>` — the one deliberate shape
+difference in the family: a recommendation is assembled *from* the
+other three real facets rather than derived purely from raw evidence,
+so this export's own signature reflects that instead of reusing
+`buildEvidencePrompt()`. Its real caller, `deriveRecommendations()`
+(`lib/decision/recommendations/recommendationGenerator.ts`), is the
+first real caller of `lib/business`'s own `buildRecommendation()`
+(Milestone 9) — see `DECISION_PLATFORM.md`'s "Recommendations" section
+for why this one is not called from `synthesizeDecision()` the way the
+other three are.
 
 **Analysis service** (`analysis.ts`) — named here since Milestone 1,
 deleted alongside `openai.ts` at Milestone 25 as part of the same retired

@@ -15,3 +15,4 @@ export * from "@/lib/decision/schemas/candidateClaim.schema";
 export * from "@/lib/decision/schemas/candidateFinding.schema";
 export * from "@/lib/decision/schemas/candidateRisk.schema";
 export * from "@/lib/decision/schemas/candidateThesisArgument.schema";
+export * from "@/lib/decision/schemas/candidateRecommendation.schema";

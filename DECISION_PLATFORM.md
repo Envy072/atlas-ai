@@ -78,7 +78,7 @@ lib/decision/
 ├── evidence/       Real aggregation of Source/Evidence across all 5 platforms
 ├── confidence/        Real, separately-tracked DecisionConfidence
 ├── readiness/           5 readiness dimensions — architecture only, no fake scores
-├── recommendations/  Aggregates lib/business's own Recommendation objects — never generates
+├── recommendations/  Real generation as of Milestone 37, plus reuse/ordering of lib/business's own Recommendation objects
 ├── memo/                 InvestmentMemo artifact — real reshaping of a DecisionProfile
 ├── diligence/       DueDiligenceReport artifact — 10 sections, real reshaping
 ├── executive/         ExecutiveSummary artifact — real selection, no generated text
@@ -343,15 +343,35 @@ evidence produces `coverage: 0` and `dataFreshnessDays: undefined` (not
 
 ---
 
-## Recommendations — Reuse Only
+## Recommendations
 
 `recommendations/recommendationAggregator.ts` imports `Recommendation`
 directly from `lib/business`'s public barrel — never redefined.
 `aggregateRecommendations()` dedupes by `id` across however many lists a
 caller supplies; `sortRecommendationsByPriority()` orders them
-urgent-first. **Decision Intelligence never generates a recommendation**
-— every one it touches was already constructed by a caller via
-`lib/business`'s own `buildRecommendation()`.
+urgent-first. Neither function decides what to recommend — that
+boundary is unchanged since this section was first written.
+
+**Update (Milestone 37): `deriveRecommendations()` is real** — the one
+exception to "Decision Intelligence never generates a recommendation."
+`recommendations/recommendationGenerator.ts`'s `deriveRecommendations()`
+reads an already-built `DecisionProfile`'s own `keyFindings`/
+`criticalRisks`/`investmentThesis` (real as of Milestones 34-36),
+computes a restricted, already-verified citable-evidence pool from
+them, and calls `lib/services/openai.ts`'s
+`generateCandidateRecommendations()` to produce candidate
+recommendations gated end to end by
+`traceability.verifyClaimTraceability()`. Every matched candidate is
+constructed via `lib/business`'s own, unmodified `buildRecommendation()`
+— Decision Intelligence still never redefines that constructor or its
+schema, it is simply this function's first real caller. Unlike
+`deriveFindings()`/`deriveCriticalRisks()`/`deriveInvestmentThesis()`,
+this function is **not** called from `synthesizeDecision()` —
+`DecisionProfile` has no `recommendations` field, so
+`deriveRecommendations()` is a second-order derivation invoked
+on-demand by whichever artifact-builder needs real recommendations
+(today, `memo.buildInvestmentMemo(profile, recommendations)`'s
+already-existing, unchanged second parameter).
 
 ---
 

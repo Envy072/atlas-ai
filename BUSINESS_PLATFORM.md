@@ -251,19 +251,28 @@ all at 50, composing to an overall score of 50.
 
 ## Recommendation Model
 
-**Architecture only — per this milestone's explicit rule ("Do NOT
-generate recommendations yet").** `schemas/recommendation.schema.ts`'s
-`Recommendation` supports every field the spec requires: `category` (one
-of the eight named — Growth, Pricing, Marketing, Operations, Technology,
-Funding, Hiring, Product), `priority`, `reason`, `requiredEvidence`, and
-`confidence`. `recommendations/recommendationBuilder.ts`'s
-`buildRecommendation()` is the one constructor — it validates and shapes
-a `Recommendation`, but decides nothing about *what* to recommend. A
-future milestone's generation logic (reading a `BusinessProfile`/
-`BusinessScore` and deciding what's actually worth recommending) calls
-this constructor for each recommendation it produces — the same
-separation of "valid shape" from "real content" every builder in this
-codebase's knowledge platforms maintains.
+**Architecture only, within this platform's own code — per this
+milestone's explicit rule ("Do NOT generate recommendations yet").**
+`schemas/recommendation.schema.ts`'s `Recommendation` supports every
+field the spec requires: `category` (one of the eight named — Growth,
+Pricing, Marketing, Operations, Technology, Funding, Hiring, Product),
+`priority`, `reason`, `requiredEvidence`, and `confidence`.
+`recommendations/recommendationBuilder.ts`'s `buildRecommendation()` is
+the one constructor — it validates and shapes a `Recommendation`, but
+decides nothing about *what* to recommend, and remains unmodified
+today. Business Platform's own generation logic (reading a
+`BusinessProfile`/`BusinessScore` and deciding what's actually worth
+recommending) is still unbuilt — see "Future Roadmap" below.
+
+**Update (Milestone 37): a real caller now exists, from a different
+platform.** Decision Intelligence's `lib/decision/recommendations/
+recommendationGenerator.ts` — reading its own `keyFindings`/
+`criticalRisks`/`investmentThesis`, not this platform's
+`BusinessProfile`/`BusinessScore` — became `buildRecommendation()`'s
+first real caller (see `DECISION_PLATFORM.md`'s "Recommendations"
+section). This does not fulfill Business Platform's own
+originally-envisioned caller described below; it is a second, distinct,
+non-conflicting real caller of the same unmodified constructor.
 
 ---
 
@@ -388,10 +397,15 @@ search-provider/financial-data credentials exist in this environment.
   future implementation (likely AI-assisted, reading real upstream
   platform data) replaces only the body.
 - **Real scoring dimensions**, once their underlying inputs are real.
-- **Recommendation generation.** A future milestone reads a
-  `BusinessProfile`/`BusinessScore` and calls
-  `recommendations.buildRecommendation()` for each real recommendation it
-  decides to surface.
+- **Recommendation generation, from this platform's own data.** A
+  future milestone reads a `BusinessProfile`/`BusinessScore` and calls
+  `recommendations.buildRecommendation()` for each real recommendation
+  it decides to surface — still unbuilt. (As of Milestone 37,
+  `buildRecommendation()` already has a first real caller, but it
+  reads Decision Intelligence's own `keyFindings`/`criticalRisks`/
+  `investmentThesis` instead — see `DECISION_PLATFORM.md`'s
+  "Recommendations" section. This item remains open: a distinct,
+  non-conflicting opportunity, not satisfied by that caller.)
 - **Real storage backends**, `SupabaseBusinessStore` first.
 - **Investor Intelligence module** reuses `BusinessScore` and
   `BusinessProfile.economicMoat`/`operationalRisks` for investor-facing

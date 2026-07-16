@@ -29,6 +29,7 @@ export {
   aggregateRecommendations,
   sortRecommendationsByPriority,
 } from "@/lib/decision/recommendations/recommendationAggregator";
+export { deriveRecommendations } from "@/lib/decision/recommendations/recommendationGenerator";
 
 export { buildInvestmentMemo } from "@/lib/decision/memo/investmentMemo";
 export { buildDueDiligenceReport } from "@/lib/decision/diligence/dueDiligenceReport";
