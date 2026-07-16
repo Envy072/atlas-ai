@@ -13,19 +13,37 @@ Readiness, Acquisition Review, Bank Lending Assessment, Accelerator
 Evaluation) is expected to consume instead of implementing business
 analysis itself.
 
-**Status: not wired into the application.** Nothing in `lib/analysis/`,
-`lib/research/`, `lib/competitors/`, `lib/market/`, `lib/financial/`,
-`lib/business/`, `lib/store/`, `app/api/`, or `lib/schemas/` imports from
-`lib/decision/` — those nine paths are frozen this milestone and remain
-completely unchanged. `lib/decision/` is free-standing, and consumes
-exactly five things from outside itself: `lib/research`'s public barrel
-(`runResearch`, `Source`/`Evidence`), `lib/competitors`'s public barrel
+**Status (Milestone 10): not wired into the application.** Nothing in
+`lib/analysis/`, `lib/research/`, `lib/competitors/`, `lib/market/`,
+`lib/financial/`, `lib/business/`, `lib/store/`, `app/api/`, or
+`lib/schemas/` imported from `lib/decision/` — those nine paths were
+frozen that milestone and remained completely unchanged. `lib/decision/`
+was free-standing at the time, and consumed exactly five things from
+outside itself: `lib/research`'s public barrel (`runResearch`,
+`Source`/`Evidence`), `lib/competitors`'s public barrel
 (`discoverCompetitors`, `RefreshMetadata`, `computeNextRefresh`/
 `determineRefreshPriority`), `lib/market`'s public barrel
 (`discoverMarket`, `Severity`), `lib/financial`'s public barrel
 (`discoverFinancials`, `FundingStage`), and `lib/business`'s public
 barrel (`discoverBusiness`, `CompetitivePosition`, `BusinessHealth`,
 `Recommendation`) — never a deep import, never a direct provider call.
+
+**Update (Milestone 31): partially wired.** `DecisionProfile` synthesis
+itself (`synthesizeDecision()`) has in fact been live since Milestone
+12, via `lib/pipeline/stages/decision.ts` — every real analysis a
+founder runs already produces one. What remained genuinely unwired
+until Milestone 31 were this platform's three downstream artifacts:
+`buildExecutiveSummary()`, `buildInvestmentMemo()`, and
+`buildDueDiligenceReport()` each had zero callers anywhere in the
+application, confirmed by direct grep, from Milestone 10 through
+Milestone 30. `app/projects/[id]/executive-summary`,
+`app/projects/[id]/memo`, and `app/projects/[id]/diligence` now call
+each of these three directly — no service wrapper, no new schema, no
+change to any of the functions themselves. Everything else this
+document describes (thesis/finding/red-flag/recommendation generation,
+real readiness assessment, a Supabase-backed store) remains exactly as
+unwired/architecture-only as it was before Milestone 31 — see
+`MILESTONE_31_DESIGN.md`'s own Non-Goals for the explicit boundary.
 
 **Architectural principle, as given:** Decision Intelligence is a
 synthesis layer. It orchestrates and synthesizes only — it must never
@@ -89,10 +107,15 @@ engine.synthesizeDecision({ startupIdea })
   │     from Research's own result, Market/Financial/Business's own
   │     profiles, and every Competitor candidate — real aggregation only
   │
-  └─ engine.buildDecisionProfile({ decisionContext, businessSummary, swot, sources, evidence })
+  ├─ findings.deriveFindings(startupIdea, evidence)   → Finding[] (REAL as of Milestone 34 —
+  │     evidence-constrained generation via lib/services/openai.ts, gated end to end by
+  │     traceability.verifyClaimTraceability(); called here, ahead of buildDecisionProfile,
+  │     because real generation is async and buildDecisionProfile stays synchronous — see
+  │     "Findings" below)
+  │
+  └─ engine.buildDecisionProfile({ decisionContext, businessSummary, swot, sources, evidence, findings })
         │
         ├─ thesis.deriveEmptyThesis()         → investmentThesis (honest, empty)
-        ├─ findings.deriveFindings()          → keyFindings (honest, empty)
         ├─ redflags.deriveCriticalRisks()     → criticalRisks (honest, empty)
         ├─ confidence.computeDecisionConfidence() → confidenceSummary (real, computed)
         ├─ readiness.deriveDecisionReadiness() → decisionReadiness (honest, unassessed)
@@ -186,8 +209,23 @@ them — the honest outcome, not a bug), and reuses `profile.evidence`/
 `schemas/finding.schema.ts`'s `Finding` supports `category`, `severity`
 (reusing `lib/market`'s own three-level `Severity`), `summary`,
 `evidence`, `confidence`. `findings/findingBuilder.ts`'s `buildFinding()`
-is the real constructor; `deriveFindings()` returns `[]` — generating a
-real finding requires an analysis engine this platform doesn't have yet.
+is the real constructor, unmodified since Milestone 10.
+
+**Update (Milestone 34): `deriveFindings()` is real.** It no longer
+returns `[]` unconditionally — it is now `async`, takes
+`(startupIdea, evidence)`, and calls `lib/services/openai.ts`'s
+`generateCandidateFindings()` to produce candidate findings
+constrained to the evidence it was given. Every candidate is checked by
+`lib/decision/traceability/claimVerifier.ts`'s `verifyClaimTraceability()`
+(Milestone 33, unmodified) before it can become a real `Finding` — a
+candidate citing evidence that doesn't resolve is dropped entirely, never
+surfaced. A failed generation call, or an empty evidence array, still
+degrades to `[]` — the same honest-empty outcome this platform has always
+produced when it has nothing real to report, now reached via a real
+attempt rather than an unconditional stub. Called from
+`engine/decisionEngine.ts`'s `synthesizeDecision()` (already async), not
+from inside `buildDecisionProfile()` (kept synchronous) — see the pipeline
+diagram above.
 
 ### Red Flags — Evidence-Backed Only
 
@@ -360,11 +398,20 @@ Every one of these is expected to consume `lib/decision/`'s public
 barrel — never re-implement business analysis itself:
 
 - **Investor Reports** — consumes `DecisionProfile` directly, or
-  `buildInvestmentMemo()`'s reshaped output.
-- **Due Diligence** — consumes `buildDueDiligenceReport()`.
-- **Investment Memo** — consumes `buildInvestmentMemo()`.
-- **Executive Summary** — consumes `buildExecutiveSummary()`.
-- **Funding Readiness** — consumes `DecisionProfile.decisionReadiness.funding`
+  `buildInvestmentMemo()`'s reshaped output. Partially satisfied: a
+  founder's Investment Memo (below) is already investor-report-shaped
+  output, reachable today at `/projects/{id}/memo`.
+- **Due Diligence** — ✅ delivered (Milestone 31):
+  `buildDueDiligenceReport()` is now called by
+  `app/projects/[id]/diligence/page.tsx`.
+- **Investment Memo** — ✅ delivered (Milestone 31):
+  `buildInvestmentMemo()` is now called by
+  `app/projects/[id]/memo/page.tsx`.
+- **Executive Summary** — ✅ delivered (Milestone 31):
+  `buildExecutiveSummary()` is now called by
+  `app/projects/[id]/executive-summary/page.tsx`.
+- **Funding Readiness** — still unwired; consumes
+  `DecisionProfile.decisionReadiness.funding`
   once a real assessment exists.
 - **Acquisition Review** — consumes `DecisionProfile.criticalRisks` and
   `businessSummary` for risk-weighted framing.

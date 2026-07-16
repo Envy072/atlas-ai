@@ -8,7 +8,7 @@ import { DecisionProfileSchema } from "@/lib/decision/schemas/decision.schema";
 import type { DecisionContext } from "@/lib/decision/schemas/context.schema";
 import type { BusinessSummary } from "@/lib/decision/schemas/businessSummary.schema";
 import { deriveEmptyThesis } from "@/lib/decision/thesis/investmentThesis";
-import { deriveFindings } from "@/lib/decision/findings/findingBuilder";
+import type { Finding } from "@/lib/decision/schemas/finding.schema";
 import { deriveCriticalRisks } from "@/lib/decision/redflags/riskFinding";
 import { deriveDecisionReadiness } from "@/lib/decision/readiness/decisionReadiness";
 import { computeDecisionConfidence } from "@/lib/decision/confidence/decisionConfidence";
@@ -83,6 +83,17 @@ export interface BuildDecisionProfileInput {
   businessProfile: BusinessProfile;
   sources?: Source[];
   evidence?: Evidence[];
+  // Milestone 34, additive — real, evidence-constrained findings
+  // computed by the caller via deriveFindings() (now async, since real
+  // generation requires a network call) and passed in here already
+  // computed, exactly like every other cross-platform input above.
+  // buildDecisionProfile() itself stays synchronous — deriveFindings()
+  // is called from synthesizeDecision() (already async), never from
+  // here, so this function's own signature and every existing caller
+  // of it (including buildDecisionProfileFixture() and its 24 call
+  // sites) are unaffected by this milestone (MILESTONE_34_DESIGN.md
+  // Section 5).
+  findings?: Finding[];
   now?: Date;
 }
 
@@ -99,7 +110,7 @@ export function buildDecisionProfile(input: BuildDecisionProfileInput): Decision
   const evidence = input.evidence ?? [];
   const keyCompetitors = input.keyCompetitors ?? [];
 
-  const findings = deriveFindings();
+  const findings = input.findings ?? [];
   const criticalRisks = deriveCriticalRisks();
 
   const checklist: CoverageChecklist = {

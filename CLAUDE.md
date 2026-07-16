@@ -377,21 +377,34 @@ Services live in `lib/services/` and are the only place allowed to talk to
 an external system. Every service function is `async`, returns a typed
 value or throws an `AppError` subclass, and has zero React/Next.js imports.
 
-**OpenAI service** (`openai.ts`) owns the client and the Atlas system
-prompt. `generateStartupAnalysis(idea)` is the only export; it returns the
-raw parsed JSON, **not yet schema-validated** (that's `analysis.ts`'s job).
-A failed request or malformed JSON throws `ExternalServiceError`, never a
-bare string or `Error`. The system prompt is the product's core IP — treat
-changes to it as a product decision, reviewed as carefully as pricing.
-Callers never supply their own prompt or model name; if Atlas AI ever
-supports multiple providers, the provider-selection logic lives *inside*
-this file, behind the same exported signature.
+**OpenAI service** (`openai.ts`) owns the client and every real-generation
+prompt this product uses. The original `generateStartupAnalysis(idea)`
+description this section once had was deleted at Milestone 25 (retiring
+the entire legacy, pre-six-platform analysis flow it served) — as of
+Milestone 34, this file is real again, purpose-built for the six-platform
+architecture's own evidence-constrained generation instead. Its first
+export, `generateCandidateFindings(startupIdea, evidence)`, returns a
+schema-valid `CandidateFinding[]` (validated at the API level itself via
+`zodResponseFormat`, not raw unvalidated JSON — a stronger guarantee than
+this section previously described, made possible by SDK-level structured
+output). A failed request, a model refusal, or an unparseable result all
+throw `ExternalServiceError`, never a bare string or `Error`. The system
+prompt is the product's core IP — treat changes to it as a product
+decision, reviewed as carefully as pricing. Callers never supply their own
+prompt or model name; each real generation milestone (35–37) adds its own
+export to this same file, behind its own signature, never its own OpenAI
+client construction elsewhere.
 
-**Analysis service** (`analysis.ts`) orchestrates "idea string in, validated
-`AnalysisResult` out": calls the OpenAI service, then `parseOrThrow`s the
-result. This is the only function a route or Server Component calls for an
-analysis — never call `generateStartupAnalysis` directly, which would skip
-validation.
+**Analysis service** (`analysis.ts`) — named here since Milestone 1,
+deleted alongside `openai.ts` at Milestone 25 as part of the same retired
+legacy flow. Unlike `openai.ts`, no replacement for this file has been
+built as of Milestone 34 — Decision Intelligence's own
+`lib/decision/findings/findingBuilder.ts` now plays the equivalent
+"orchestrate generation, then validate" role for findings specifically,
+but no general-purpose successor to `analysis.ts` itself exists. This
+paragraph is flagged here as known-stale, not rewritten — matching this
+project's own established practice of naming a documentation drift
+without fixing something outside the current milestone's scope.
 
 **Projects service** (`projects.ts`) owns all reads/writes to the Supabase
 `projects` table. `persistProjectFromSession` logs and swallows a failure
@@ -882,8 +895,10 @@ so a new engineer can predict the shape of a service they've never seen.
 **Provider swappability behind service boundaries.** Switching or adding a
 model provider should be containable entirely inside
 `lib/services/openai.ts` — callers depend on
-`generateStartupAnalysis(idea): Promise<unknown>`, not on it being OpenAI
-specifically. The same applies to Supabase behind `services/projects.ts`.
+`generateCandidateFindings(startupIdea, evidence): Promise<CandidateFinding[]>`
+(and each real generation milestone's own equivalent export), not on any
+of them being OpenAI specifically. The same applies to Supabase behind
+`services/projects.ts`.
 
 **From synchronous toward event-driven, only when it earns its keep.**
 Today an analysis is generated synchronously within one HTTP request. If

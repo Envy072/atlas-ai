@@ -4,6 +4,9 @@ import type { Finding } from "@/lib/decision/schemas/finding.schema";
 import { FindingSchema } from "@/lib/decision/schemas/finding.schema";
 import type { FindingCategory } from "@/lib/decision/schemas/enums";
 import { parseOrThrow } from "@/lib/validation/parse";
+import { verifyClaimTraceability } from "@/lib/decision/traceability/claimVerifier";
+import { generateCandidateFindings } from "@/lib/services/openai";
+import type { CandidateFinding } from "@/lib/decision/schemas/candidateFinding.schema";
 
 let findingIdCounter = 0;
 
@@ -37,9 +40,46 @@ export function buildFinding(input: BuildFindingInput): Finding {
   );
 }
 
-// ARCHITECTURE ONLY. Generating real findings requires an analysis
-// engine this platform doesn't have yet — stays honestly empty until a
-// future module supplies real, evidenced findings.
-export function deriveFindings(): Finding[] {
-  return [];
+// Real generation, evidence-constrained end to end
+// (MILESTONE_34_DESIGN.md Section 5). Every candidate
+// generateCandidateFindings() returns is checked by
+// verifyClaimTraceability() (Milestone 33, unmodified) before it can
+// ever become a real Finding via buildFinding() (unmodified since
+// Milestone 10) — a candidate that fails is dropped entirely, never
+// shown with a caveat (ATLAS_AI_V2_FINAL.md Section 5).
+//
+// Graceful degradation: a generation failure is logged and degrades to
+// [] rather than failing the entire six-stage pipeline over a
+// transient LLM hiccup — the same reasoning
+// persistProjectFromSession() already applies to a failed database
+// write, applied here to a failed generation call.
+export async function deriveFindings(startupIdea: string, evidence: Evidence[]): Promise<Finding[]> {
+  if (evidence.length === 0) return [];
+
+  let candidates: CandidateFinding[];
+  try {
+    candidates = await generateCandidateFindings(startupIdea, evidence);
+  } catch (error) {
+    console.error("Finding generation failed:", error);
+    return [];
+  }
+
+  const findings: Finding[] = [];
+
+  for (const candidate of candidates) {
+    const verification = verifyClaimTraceability(candidate, evidence);
+    if (verification.status !== "matched") continue;
+
+    findings.push(
+      buildFinding({
+        category: candidate.category,
+        severity: candidate.severity,
+        summary: candidate.summary,
+        evidence: verification.resolvedEvidence,
+        confidence: candidate.confidence,
+      })
+    );
+  }
+
+  return findings;
 }
