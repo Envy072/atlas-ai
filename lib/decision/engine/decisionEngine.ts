@@ -12,6 +12,7 @@ import { buildDecisionProfile } from "@/lib/decision/engine/decisionProfileBuild
 import { aggregateEvidence } from "@/lib/decision/evidence/evidenceAggregator";
 import { deriveFindings } from "@/lib/decision/findings/findingBuilder";
 import { deriveCriticalRisks } from "@/lib/decision/redflags/riskFinding";
+import { deriveInvestmentThesis } from "@/lib/decision/thesis/investmentThesis";
 import { parseOrThrow } from "@/lib/validation/parse";
 
 // Frames the startup idea as a decision-synthesis query — a deliberately
@@ -107,6 +108,14 @@ export async function synthesizeDecision(
   // Section 5).
   const criticalRisks = await deriveCriticalRisks(request.startupIdea, aggregated.evidence);
 
+  // Milestone 36: real, evidence-constrained investment thesis
+  // generation — the identical async-migration pattern deriveFindings()/
+  // deriveCriticalRisks() above already use, applied to
+  // deriveInvestmentThesis() (previously called inline inside
+  // buildDecisionProfile()) (MILESTONE_36_DESIGN.md Section 5). Closes
+  // the last of the three facets that started this way.
+  const investmentThesis = await deriveInvestmentThesis(request.startupIdea, aggregated.evidence);
+
   const profile = buildDecisionProfile({
     decisionContext: {
       startupIdea: request.startupIdea,
@@ -157,6 +166,7 @@ export async function synthesizeDecision(
     evidence: aggregated.evidence,
     findings,
     criticalRisks,
+    investmentThesis,
   });
 
   return parseOrThrow(

@@ -34,3 +34,11 @@ export type RedFlagSeverity = z.infer<typeof RedFlagSeveritySchema>;
 export const ReadinessLevelSchema = z.enum(["not_ready", "emerging", "ready", "strong"]);
 
 export type ReadinessLevel = z.infer<typeof ReadinessLevelSchema>;
+
+// Which of InvestmentThesis's four arrays a candidate thesis argument
+// belongs in (MILESTONE_36_DESIGN.md Section 5) — a different axis from
+// FindingCategory (knowledge domain) or RedFlagSeverity (escalation
+// tier): this one determines bucket placement, not topic or severity.
+export const ThesisArgumentKindSchema = z.enum(["positive", "negative", "unknown", "contradiction"]);
+
+export type ThesisArgumentKind = z.infer<typeof ThesisArgumentKindSchema>;

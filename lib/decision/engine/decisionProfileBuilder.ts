@@ -8,6 +8,7 @@ import { DecisionProfileSchema } from "@/lib/decision/schemas/decision.schema";
 import type { DecisionContext } from "@/lib/decision/schemas/context.schema";
 import type { BusinessSummary } from "@/lib/decision/schemas/businessSummary.schema";
 import { deriveEmptyThesis } from "@/lib/decision/thesis/investmentThesis";
+import type { InvestmentThesis } from "@/lib/decision/schemas/thesis.schema";
 import type { Finding } from "@/lib/decision/schemas/finding.schema";
 import type { RiskFinding } from "@/lib/decision/schemas/riskFinding.schema";
 import { deriveDecisionReadiness } from "@/lib/decision/readiness/decisionReadiness";
@@ -101,6 +102,19 @@ export interface BuildDecisionProfileInput {
   // buildDecisionProfile() now computes zero fields inline for either
   // findings or critical risks (MILESTONE_35_DESIGN.md Section 5).
   criticalRisks?: RiskFinding[];
+  // Milestone 36, additive — real, evidence-constrained investment
+  // thesis computed by the caller via deriveInvestmentThesis() (now
+  // async, for the identical reason findings/criticalRisks above are),
+  // passed in here already computed. Unlike findings/criticalRisks,
+  // deriveEmptyThesis() is still directly used here — as the fallback
+  // default (`input.investmentThesis ?? deriveEmptyThesis()`), not an
+  // unconditional call — since this function still needs an honest,
+  // schema-valid empty thesis for any caller that supplies none
+  // (MILESTONE_36_DESIGN.md Section 4.3). Closes the last of the three
+  // facets that started as an inline call inside this function; only
+  // buildRecommendation()'s own output remains inline, left for
+  // Milestone 37.
+  investmentThesis?: InvestmentThesis;
   now?: Date;
 }
 
@@ -148,7 +162,7 @@ export function buildDecisionProfile(input: BuildDecisionProfileInput): Decision
       id: nextDecisionId(),
       decisionContext: input.decisionContext,
       businessSummary: input.businessSummary,
-      investmentThesis: deriveEmptyThesis(),
+      investmentThesis: input.investmentThesis ?? deriveEmptyThesis(),
       keyFindings: findings,
       strengths: input.strengths ?? [],
       weaknesses: input.weaknesses ?? [],

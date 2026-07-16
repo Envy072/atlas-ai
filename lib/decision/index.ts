@@ -9,7 +9,11 @@ export { buildDecisionProfile } from "@/lib/decision/engine/decisionProfileBuild
 export { mergeDecisionProfile } from "@/lib/decision/engine/profileMerger";
 export { synthesizeDecision } from "@/lib/decision/engine/decisionEngine";
 
-export { buildInvestmentThesis, deriveEmptyThesis } from "@/lib/decision/thesis/investmentThesis";
+export {
+  buildInvestmentThesis,
+  deriveEmptyThesis,
+  deriveInvestmentThesis,
+} from "@/lib/decision/thesis/investmentThesis";
 export { buildFinding, deriveFindings } from "@/lib/decision/findings/findingBuilder";
 export { buildRiskFinding, deriveCriticalRisks } from "@/lib/decision/redflags/riskFinding";
 

@@ -72,7 +72,7 @@ each own one facet of the `DecisionProfile`, or one downstream artifact:
 
 ```
 lib/decision/
-├── thesis/            Investment Thesis — architecture only, no AI generation, no conclusions
+├── thesis/            Investment Thesis — real generation as of Milestone 36, no conclusions
 ├── findings/           Reusable Finding objects
 ├── redflags/             Reusable RiskFinding objects — evidence-backed only
 ├── evidence/       Real aggregation of Source/Evidence across all 5 platforms
@@ -118,9 +118,13 @@ engine.synthesizeDecision({ startupIdea })
   │     traceability.verifyClaimTraceability(); called here for the identical reason
   │     deriveFindings() is — see "Red Flags" below)
   │
-  └─ engine.buildDecisionProfile({ decisionContext, businessSummary, swot, sources, evidence, findings, criticalRisks })
+  ├─ thesis.deriveInvestmentThesis(startupIdea, evidence) → InvestmentThesis (REAL as of Milestone 36 —
+  │     evidence-constrained generation via lib/services/openai.ts, gated end to end by
+  │     traceability.verifyClaimTraceability(); called here for the identical reason
+  │     deriveFindings()/deriveCriticalRisks() are — see "Investment Thesis" below)
+  │
+  └─ engine.buildDecisionProfile({ decisionContext, businessSummary, swot, sources, evidence, findings, criticalRisks, investmentThesis })
         │
-        ├─ thesis.deriveEmptyThesis()         → investmentThesis (honest, empty)
         ├─ confidence.computeDecisionConfidence() → confidenceSummary (real, computed)
         ├─ readiness.deriveDecisionReadiness() → decisionReadiness (honest, unassessed)
         │
@@ -174,11 +178,12 @@ metric, and never derives a business strategy — it only:
 1. **Really passes through** already-discovered values (`businessModel`,
    SWOT, `marketIndustry`, `fundingStage`) without altering them.
 2. **Honestly defaults to empty/absent** wherever no real synthesis
-   engine exists yet (`investmentThesis`, `keyFindings`,
-   `decisionReadiness` — see each facet's own "architecture only"
-   discipline below), each documented with why. `criticalRisks` was
-   part of this list before Milestone 35 — see "Red Flags" below for
-   its own real-generation update.
+   engine exists yet (`keyFindings`, `decisionReadiness` — see each
+   facet's own "architecture only" discipline below), each documented
+   with why. `criticalRisks` was part of this list before Milestone 35
+   — see "Red Flags" below for its own real-generation update.
+   `investmentThesis` was part of this list before Milestone 36 — see
+   "Investment Thesis" below for its own real-generation update.
 3. **Really computes** the few things that are genuinely derivable facts,
    not judgments: `confidenceSummary` (see Confidence Model below) and
    `openQuestions` (a real presence/absence check — e.g. "Value
@@ -189,15 +194,44 @@ metric, and never derives a business strategy — it only:
    placeholders" is always true today, and a second limitation is added
    only when the aggregated evidence set is actually empty).
 
-### Investment Thesis — Architecture Only
+### Investment Thesis
 
 `schemas/thesis.schema.ts`'s `InvestmentThesis` deliberately has **no
 conclusion or verdict field** — it represents the raw material (positive
 arguments, negative arguments, unknowns, contradictions, supporting
 evidence) a thesis is built from, never a synthesized judgment.
 `thesis/investmentThesis.ts`'s `deriveEmptyThesis()` returns every field
-empty; `buildInvestmentThesis()` is the real constructor a future module
-calls once it has real, evidenced arguments to record.
+empty; `buildInvestmentThesis()` is the real constructor a caller calls
+once it has real, evidenced arguments to record.
+
+**Update (Milestone 36): `deriveInvestmentThesis()` is real.** It no
+longer relies on `deriveEmptyThesis()` unconditionally — it is now
+`async`, takes `(startupIdea, evidence)`, and calls
+`lib/services/openai.ts`'s `generateCandidateThesisArguments()` to
+produce candidate arguments constrained to the evidence it was given,
+each tagged with a `kind` (`positive`/`negative`/`unknown`/
+`contradiction`) that determines which of `InvestmentThesis`'s four
+arrays it belongs in. Every candidate is checked by
+`lib/decision/traceability/claimVerifier.ts`'s `verifyClaimTraceability()`
+(Milestone 33, unmodified) before its summary can be bucketed — a
+candidate citing evidence that doesn't resolve is dropped entirely,
+never surfaced. Every matched candidate's resolved evidence is unioned
+across all four kinds and deduplicated by id (`lib/decision/utils/dedupeByKey.ts`,
+reused unmodified) into one shared `supportingEvidence` pool. A failed
+generation call, or an empty evidence array, still degrades to
+`deriveEmptyThesis()`'s exact shape — the same honest-empty outcome
+this platform has always produced when it has nothing real to report,
+now reached via a real attempt rather than an unconditional stub.
+Called from `engine/decisionEngine.ts`'s `synthesizeDecision()`
+(already async), not from inside `buildDecisionProfile()` (kept
+synchronous) — see the pipeline diagram above.
+
+`unknowns` here means a real ambiguity the *existing evidence itself*
+raises but doesn't resolve — grounded in cited evidence, subject to
+traceability verification. It is a different thing from
+`openQuestions`/`decisionLimitations` (above), which record a total
+*absence* of evidence or research on a topic — mechanically computed,
+never LLM-generated, with nothing to cite.
 
 ### Due Diligence — Architecture Only, 10 Sections
 

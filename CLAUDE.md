@@ -398,7 +398,14 @@ second, sibling function of the same shape,
 `generateCandidateRisks(startupIdea, evidence): Promise<CandidateRisk[]>`
 — structurally identical to `generateCandidateFindings()` (same evidence
 selection, same SDK call shape, same error handling), differing only in
-its schema and its own risk-specific system prompt.
+its schema and its own risk-specific system prompt. As of Milestone 36,
+this file exports a third, sibling function,
+`generateCandidateThesisArguments(startupIdea, evidence):
+Promise<CandidateThesisArgument[]>` — the same structural shape again,
+differing only in its schema and its own thesis-specific system prompt;
+the shared user-message builder the three exports now use in common was
+consolidated into one function (`buildEvidencePrompt()`) at this same
+milestone, once a third identical copy made the duplication unambiguous.
 
 **Analysis service** (`analysis.ts`) — named here since Milestone 1,
 deleted alongside `openai.ts` at Milestone 25 as part of the same retired
