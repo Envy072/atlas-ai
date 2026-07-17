@@ -12,7 +12,7 @@ export default function Navbar() {
 
         <nav className="hidden items-center gap-8 md:flex">
           <Link href="#">Features</Link>
-          <Link href="#">Pricing</Link>
+          <Link href="/pricing">Pricing</Link>
           <Link href="#">Blog</Link>
           <Link href="#">Contact</Link>
         </nav>
