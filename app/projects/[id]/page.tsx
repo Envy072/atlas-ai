@@ -3,12 +3,13 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/services/auth";
 import { getProjectById } from "@/lib/services/projects";
-import { buildDecisionArtifacts } from "@/lib/decision";
+import { buildDecisionArtifacts, isDecisionStale } from "@/lib/decision";
 import { formatRelativeTime } from "@/lib/format";
 import { H1, Small } from "@/components/ui/typography";
 import DecisionReport from "@/components/workspace/decision-report/DecisionReport";
 import DecisionArtifactLinks from "@/components/workspace/decision-report/DecisionArtifactLinks";
 import FlagAnalysisDialog from "@/components/workspace/decision-report/FlagAnalysisDialog";
+import StaleAnalysisBadge from "@/components/workspace/decision-report/StaleAnalysisBadge";
 
 interface ProjectDetailPageProps {
   params: Promise<{ id: string }>;
@@ -39,6 +40,13 @@ interface ProjectDetailPageProps {
 // lifecycle (POST /api/analysis-flags), entirely disjoint from this
 // page's own server-side data fetching above. It calls no Decision
 // Intelligence function and cannot affect this page's own render.
+//
+// As of Milestone 41, this route also computes staleness via
+// isDecisionStale() (lib/decision/refresh, real and unmodified since
+// Milestone 31) against a single `now`, so the check is deterministic
+// within one render rather than re-evaluating Date.now() implicitly.
+// StaleAnalysisBadge only renders the boolean this page hands it — it
+// never computes staleness itself.
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const { id } = await params;
   const user = await getCurrentUser();
@@ -54,6 +62,8 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
   }
 
   const { verdict } = await buildDecisionArtifacts(project.profile);
+  const now = new Date();
+  const isStale = isDecisionStale(project.profile, now);
 
   return (
     <div className="mx-auto max-w-5xl p-8">
@@ -65,11 +75,10 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
         Back to projects
       </Link>
 
-      <div className="mb-8">
+      <div className="mb-8 space-y-2">
         <H1>{project.title}</H1>
-        <Small className="mt-1 block text-muted-foreground">
-          Analyzed {formatRelativeTime(project.createdAt)}
-        </Small>
+        <Small className="block text-muted-foreground">Analyzed {formatRelativeTime(project.createdAt)}</Small>
+        <StaleAnalysisBadge isStale={isStale} lastUpdated={project.profile.refresh.lastUpdated} />
       </div>
 
       <DecisionArtifactLinks projectId={project.id} />
