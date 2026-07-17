@@ -8,6 +8,7 @@ import { formatRelativeTime } from "@/lib/format";
 import { H1, Small } from "@/components/ui/typography";
 import DecisionReport from "@/components/workspace/decision-report/DecisionReport";
 import DecisionArtifactLinks from "@/components/workspace/decision-report/DecisionArtifactLinks";
+import FlagAnalysisDialog from "@/components/workspace/decision-report/FlagAnalysisDialog";
 
 interface ProjectDetailPageProps {
   params: Promise<{ id: string }>;
@@ -32,6 +33,12 @@ interface ProjectDetailPageProps {
 // someone else" identically (a null return) — notFound() fires for all
 // three alike, so a guessed id never reveals which case it was
 // (MILESTONE_29_DESIGN.md Section 9, "Enumeration resistance").
+//
+// As of Milestone 39, this route also renders FlagAnalysisDialog — a
+// self-contained Client Component with its own independent request
+// lifecycle (POST /api/analysis-flags), entirely disjoint from this
+// page's own server-side data fetching above. It calls no Decision
+// Intelligence function and cannot affect this page's own render.
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const { id } = await params;
   const user = await getCurrentUser();
@@ -66,6 +73,10 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
       </div>
 
       <DecisionArtifactLinks projectId={project.id} />
+
+      <div className="mb-8 flex justify-end">
+        <FlagAnalysisDialog projectId={project.id} />
+      </div>
 
       <DecisionReport profile={project.profile} verification={project.verification} verdict={verdict} />
     </div>

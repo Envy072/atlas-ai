@@ -484,6 +484,28 @@ Built on `lib/supabase/server.ts`'s cookie-aware client, which is why
 this file (like `projects.ts` above) is a deliberate, named exception to
 "services are framework-agnostic."
 
+**Analysis flags service** (`analysisFlags.ts`, Milestone 39) owns all
+writes to the `analysis_flags` table — the "flag an incorrect result"
+mechanism behind Phase 3's private cohort launch. Its one export,
+`submitAnalysisFlag(input, userId): Promise<AnalysisFlag>`, verifies the
+caller owns the referenced project (via `projects.ts`'s own
+`getProjectById()`, reused unmodified — the only cross-domain import
+this file has) before inserting a new, immutable row. Deliberately not
+part of Decision Intelligence: it has no discovery step, no evidence, no
+AI generation, and imports nothing from `lib/decision/` or
+`lib/services/openai.ts` — architecturally closer to `projects.ts` than
+to any of the six knowledge platforms. Unlike `persistProjectFromSession`'s
+own "log and swallow" convention, a failed submission always throws — a
+persistence hiccup here must surface to the reporting founder, not be
+silently absorbed, since a lost incident report would defeat this
+milestone's own purpose. The `analysis_flags` table has an `INSERT`
+policy only — deliberately no `SELECT`/`UPDATE`/`DELETE` policy of any
+kind, since no application code ever reads this table back; the team
+reviews submitted flags directly via Supabase's own dashboard, under
+different credentials entirely, unaffected by RLS policies scoped to the
+`authenticated`/`anon` roles. See `MILESTONE_39_DESIGN.md` for the full
+schema, taxonomy, and deletion-behavior reasoning.
+
 ---
 
 ## 9. UI Rules

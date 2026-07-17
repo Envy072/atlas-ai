@@ -4,6 +4,7 @@ import {
   ValidationError,
   ExternalServiceError,
   InvalidRequestError,
+  UnauthorizedError,
   getErrorMessage,
   getErrorStatus,
 } from "@/lib/errors";
@@ -58,6 +59,19 @@ describe("InvalidRequestError", () => {
     const error = new InvalidRequestError();
     expect(error.status).toBe(400);
     expect(error.code).toBe("invalid_request");
+  });
+});
+
+describe("UnauthorizedError", () => {
+  it("defaults to status 401 and code 'unauthorized'", () => {
+    const error = new UnauthorizedError();
+    expect(error.status).toBe(401);
+    expect(error.code).toBe("unauthorized");
+    expect(error).toBeInstanceOf(AppError);
+  });
+
+  it("accepts a custom message", () => {
+    expect(new UnauthorizedError("Nope.").message).toBe("Nope.");
   });
 });
 

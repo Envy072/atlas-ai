@@ -50,6 +50,19 @@ export class InvalidRequestError extends AppError {
   }
 }
 
+// The caller is not signed in, and the route requires it (Milestone
+// 39 — the first API route in this codebase to require authentication
+// rather than merely reading identity when present). Deliberately
+// distinct from InvalidRequestError: "you're not allowed to do this at
+// all" and "you sent bad data" are different failure classes.
+export class UnauthorizedError extends AppError {
+  constructor(message = "You must be signed in to do this.") {
+    super(message, { status: 401, code: "unauthorized" });
+    this.name = "UnauthorizedError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;

@@ -3,6 +3,7 @@ export {
   ValidationError,
   ExternalServiceError,
   InvalidRequestError,
+  UnauthorizedError,
   getErrorMessage,
   getErrorStatus,
 } from "./AppError";
