@@ -27,6 +27,18 @@ numeric score, a verdict, an investment decision, a confidence level,
 strengths, weaknesses, risks, opportunities, and a next-steps roadmap, as
 one structured analysis.
 
+This vision predates, and is broader than, any single implementation of
+it. As of Milestone 38, "a verdict" and "a confidence level" are real,
+independent, six-platform-architecture-native artifacts —
+`lib/decision/schemas/verdict.schema.ts`'s `DecisionVerdict`, produced
+by `deriveVerdict()` and mechanically confidence-scored, evidence-
+traceable end to end via Milestone 33's traceability gate — not a
+resurrection of the deleted legacy pipeline's own single-prompt
+`score`/`verdict`/`investment_decision` fields (see `PIPELINE.md` for
+that retired shape). The rest of this vision statement (a numeric
+score, a next-steps roadmap) remains aspirational, not yet built this
+way.
+
 The system prompt driving this (`lib/services/openai.ts`) is deliberately
 adversarial: Atlas AI is instructed to think like a Y Combinator partner, a
 Sequoia investor, a McKinsey strategist, a product manager, a growth
@@ -391,7 +403,7 @@ output). A failed request, a model refusal, or an unparseable result all
 throw `ExternalServiceError`, never a bare string or `Error`. The system
 prompt is the product's core IP — treat changes to it as a product
 decision, reviewed as carefully as pricing. Callers never supply their own
-prompt or model name; each real generation milestone (35–37) adds its own
+prompt or model name; each real generation milestone (35–38) adds its own
 export to this same file, behind its own signature, never its own OpenAI
 client construction elsewhere. As of Milestone 35, this file exports a
 second, sibling function of the same shape,
@@ -418,7 +430,23 @@ so this export's own signature reflects that instead of reusing
 first real caller of `lib/business`'s own `buildRecommendation()`
 (Milestone 9) — see `DECISION_PLATFORM.md`'s "Recommendations" section
 for why this one is not called from `synthesizeDecision()` the way the
-other three are.
+other three are. As of Milestone 38, this file exports a fifth and
+final export, `generateCandidateVerdict(startupIdea, findings,
+criticalRisks, investmentThesis, recommendations, confidenceSummary,
+citableEvidence): Promise<CandidateVerdict>` — like
+`generateCandidateRecommendations()`, assembled from prior real facets
+rather than derived purely from raw evidence, but returning a single
+`CandidateVerdict` object rather than an array, since exactly one
+verdict is the correct cardinality. Its real caller, `deriveVerdict()`
+(`lib/decision/verdict/decisionVerdict.ts`), is likewise a second-order
+derivation invoked on demand, never from `synthesizeDecision()` — as of
+this milestone, both `deriveRecommendations()` and `deriveVerdict()`
+are called exclusively through one shared orchestration function,
+`buildDecisionArtifacts()` (`lib/decision/artifacts/decisionArtifacts.ts`),
+which application code (`app/projects/[id]/page.tsx`,
+`app/projects/[id]/memo/page.tsx`) calls instead of either derive
+function directly — see `DECISION_PLATFORM.md`'s "Verdict" section for
+the full architecture.
 
 **Analysis service** (`analysis.ts`) — named here since Milestone 1,
 deleted alongside `openai.ts` at Milestone 25 as part of the same retired

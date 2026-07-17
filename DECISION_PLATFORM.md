@@ -66,7 +66,7 @@ Intelligence exists to be that combining-and-reshaping layer, built once.
 
 ## Architecture
 
-Sixteen folders. `engine/` plays the same role `knowledge/` played in
+Eighteen folders. `engine/` plays the same role `knowledge/` played in
 every prior platform (build, merge, orchestrate discovery); the rest
 each own one facet of the `DecisionProfile`, or one downstream artifact:
 
@@ -75,10 +75,12 @@ lib/decision/
 ├── thesis/            Investment Thesis — real generation as of Milestone 36, no conclusions
 ├── findings/           Reusable Finding objects
 ├── redflags/             Reusable RiskFinding objects — evidence-backed only
-├── evidence/       Real aggregation of Source/Evidence across all 5 platforms
+├── evidence/       Real aggregation of Source/Evidence across all 5 platforms, plus (as of Milestone 38) computeCitableEvidence() — the restricted, already-verified pool recommendations/ and verdict/ both share
 ├── confidence/        Real, separately-tracked DecisionConfidence
 ├── readiness/           5 readiness dimensions — architecture only, no fake scores
 ├── recommendations/  Real generation as of Milestone 37, plus reuse/ordering of lib/business's own Recommendation objects
+├── verdict/            Final Verdict — real generation as of Milestone 38, mechanically confidence-scored
+├── artifacts/       buildDecisionArtifacts() — the one shared computation point calling deriveRecommendations() then deriveVerdict() together (Milestone 38)
 ├── memo/                 InvestmentMemo artifact — real reshaping of a DecisionProfile
 ├── diligence/       DueDiligenceReport artifact — 10 sections, real reshaping
 ├── executive/         ExecutiveSummary artifact — real selection, no generated text
@@ -131,14 +133,22 @@ engine.synthesizeDecision({ startupIdea })
         └─ storage.DecisionKnowledgeStore.upsert(profile)   ← caller's responsibility
 
 Later, on demand:
-  memo.buildInvestmentMemo(profile, recommendations?)     → InvestmentMemo
+  artifacts.buildDecisionArtifacts(profile)                → { recommendations, verdict } (Milestone 38 —
+        the one shared computation point: calls recommendations.deriveRecommendations()
+        then verdict.deriveVerdict(), in that order, so every caller reaches both
+        artifacts through identical orchestration logic — see "Verdict" below)
+  memo.buildInvestmentMemo(profile, recommendations?, verdict?)   → InvestmentMemo
   diligence.buildDueDiligenceReport(profile)               → DueDiligenceReport (8 sections + evidence + unknowns)
   executive.buildExecutiveSummary(profile, maxItems?)      → ExecutiveSummary
   refresh.collectStaleDecisions(profiles, now)             → priority-ordered re-synthesis queue
   engine.mergeDecisionProfile(existing, newData)           → accumulated DecisionProfile
 ```
 
-Nothing here is wired into a route or a Server Component yet.
+As of Milestone 38, `app/projects/[id]/page.tsx` and
+`app/projects/[id]/memo/page.tsx` both call `buildDecisionArtifacts()`
+— the first real routes anywhere in this codebase to reach a Decision
+Intelligence artifact live. Every other function above remains
+reachable only from application code that chooses to call it.
 
 ---
 
@@ -199,7 +209,9 @@ metric, and never derives a business strategy — it only:
 `schemas/thesis.schema.ts`'s `InvestmentThesis` deliberately has **no
 conclusion or verdict field** — it represents the raw material (positive
 arguments, negative arguments, unknowns, contradictions, supporting
-evidence) a thesis is built from, never a synthesized judgment.
+evidence) a thesis is built from, never a synthesized judgment. That
+judgment is a distinct, separately-computed artifact — see "Verdict"
+below (Milestone 38) — never merged into this schema.
 `thesis/investmentThesis.ts`'s `deriveEmptyThesis()` returns every field
 empty; `buildInvestmentThesis()` is the real constructor a caller calls
 once it has real, evidenced arguments to record.
@@ -357,8 +369,10 @@ exception to "Decision Intelligence never generates a recommendation."
 `recommendations/recommendationGenerator.ts`'s `deriveRecommendations()`
 reads an already-built `DecisionProfile`'s own `keyFindings`/
 `criticalRisks`/`investmentThesis` (real as of Milestones 34-36),
-computes a restricted, already-verified citable-evidence pool from
-them, and calls `lib/services/openai.ts`'s
+computes a restricted, already-verified citable-evidence pool via
+`evidence/citableEvidence.ts`'s `computeCitableEvidence()` (relocated
+there at Milestone 38 so `verdict/` can share it too — see "Verdict"
+below), and calls `lib/services/openai.ts`'s
 `generateCandidateRecommendations()` to produce candidate
 recommendations gated end to end by
 `traceability.verifyClaimTraceability()`. Every matched candidate is
@@ -369,9 +383,63 @@ schema, it is simply this function's first real caller. Unlike
 this function is **not** called from `synthesizeDecision()` —
 `DecisionProfile` has no `recommendations` field, so
 `deriveRecommendations()` is a second-order derivation invoked
-on-demand by whichever artifact-builder needs real recommendations
-(today, `memo.buildInvestmentMemo(profile, recommendations)`'s
-already-existing, unchanged second parameter).
+on-demand by whichever artifact-builder needs real recommendations —
+as of Milestone 38, exclusively via `artifacts/decisionArtifacts.ts`'s
+`buildDecisionArtifacts()` (see "Verdict" below), not called
+independently by application code anymore.
+
+---
+
+## Verdict
+
+**Milestone 38: `deriveVerdict()` is Decision Intelligence's fifth and
+last real-generation function.** `schemas/verdict.schema.ts`'s
+`DecisionVerdict` is a single, evidence-traceable conclusion —
+`category` (`"pursue"` | `"pursue_with_conditions"` | `"monitor"` |
+`"pass"`), a readable `summary`, `confidence` (0-100, **mechanically
+computed, never model-generated**), and `supportingEvidence`. Unlike
+every other real `CandidateX` schema, `schemas/candidateVerdict.schema.ts`'s
+`CandidateVerdict` has no `confidence` field at all — giving the model
+one would create a second, competing number with no principled way to
+reconcile it against the mechanically-computed one.
+
+`verdict/decisionVerdict.ts`'s `deriveVerdict(startupIdea, findings,
+criticalRisks, investmentThesis, recommendations, confidenceSummary)`
+is, like `deriveRecommendations()`, a second-order derivation, not a
+`synthesizeDecision()`-time call — it depends on `recommendations`,
+which is itself not a `DecisionProfile` field, for the identical
+reason `deriveRecommendations()` isn't called from
+`synthesizeDecision()`. It computes the same restricted citable pool
+`deriveRecommendations()` does (`evidence/citableEvidence.ts`'s
+`computeCitableEvidence()`), calls `lib/services/openai.ts`'s
+`generateCandidateVerdict()` for a single candidate (not an array —
+exactly one verdict is the correct cardinality), and gates it through
+`traceability.verifyClaimTraceability()` exactly as every other real
+facet does. Because there is exactly one candidate, a rejected citation
+drops the *entire* verdict, returning `undefined` — the fail-closed
+rule Milestone 33 established, applied to its own stricter consequence
+for a singular output.
+
+**Confidence is mechanically computed, not model-asserted** —
+`computeVerdictConfidence()` averages the verdict's own
+`supportingEvidence[].confidence`, mirroring
+`confidence/decisionConfidence.ts`'s own `computeEvidenceConfidence()`
+shape exactly, rather than reading a number off `Recommendation.confidence`
+(a different artifact). `recommendations` still shapes the verdict
+indirectly — via `generateCandidateVerdict()`'s own prompt — without
+ever being read directly by the confidence formula.
+
+**`artifacts/decisionArtifacts.ts`'s `buildDecisionArtifacts(profile)`
+is the one shared computation point** both `deriveRecommendations()`
+and `deriveVerdict()` are called from — application code (as of
+Milestone 38, `app/projects/[id]/page.tsx` and
+`app/projects/[id]/memo/page.tsx`) never calls either derive function
+directly. This guarantees every caller reaches both artifacts through
+identical orchestration logic, removing accidental drift as a source
+of inconsistency between callers — it does not, and cannot without
+caching or persistence (explicitly out of scope), guarantee that two
+separate requests to two separate routes produce the same verdict for
+the same project, since the underlying model call is non-deterministic.
 
 ---
 
@@ -408,7 +476,8 @@ would just be a duplicate of those platforms' own stores).
 ## Schemas
 
 One Zod schema per shape, no hand-duplicated types — `schemas/`:
-`enums.ts` (`FindingCategory`, `RedFlagSeverity`, `ReadinessLevel`),
+`enums.ts` (`FindingCategory`, `RedFlagSeverity`, `ReadinessLevel`,
+`ThesisArgumentKind`, and — as of Milestone 38 — `VerdictCategory`),
 `context.schema.ts` (`DecisionContext`, reusing `lib/financial`'s
 `FundingStage`), `businessSummary.schema.ts` (`BusinessSummary`, reusing
 `lib/business`'s `CompetitivePosition`/`BusinessHealth`),
@@ -417,8 +486,12 @@ One Zod schema per shape, no hand-duplicated types — `schemas/`:
 `readiness.schema.ts`, `decision.schema.ts` (`DecisionProfile`, reusing
 `lib/research`'s `Source`/`Evidence` and `lib/competitors`'s
 `RefreshMetadata`), `discovery.schema.ts`, `memo.schema.ts` (reusing
-`lib/business`'s `Recommendation`), `diligence.schema.ts`,
-`executive.schema.ts`.
+`lib/business`'s `Recommendation` and — as of Milestone 38 — this
+platform's own `DecisionVerdict`, optional), `diligence.schema.ts`,
+`executive.schema.ts`, `candidateClaim.schema.ts` (Milestone 33,
+`CandidateFinding`/`CandidateRisk`/`CandidateThesisArgument`/
+`CandidateRecommendation`/`CandidateVerdict`'s shared base),
+`verdict.schema.ts` and `candidateVerdict.schema.ts` (Milestone 38).
 
 ## Types
 

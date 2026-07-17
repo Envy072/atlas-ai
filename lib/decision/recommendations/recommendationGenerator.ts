@@ -1,4 +1,3 @@
-import type { Evidence } from "@/lib/research";
 import type { Finding } from "@/lib/decision/schemas/finding.schema";
 import type { RiskFinding } from "@/lib/decision/schemas/riskFinding.schema";
 import type { InvestmentThesis } from "@/lib/decision/schemas/thesis.schema";
@@ -8,29 +7,7 @@ import { sortRecommendationsByPriority } from "@/lib/decision/recommendations/re
 import { verifyClaimTraceability } from "@/lib/decision/traceability/claimVerifier";
 import { generateCandidateRecommendations } from "@/lib/services/openai";
 import type { CandidateRecommendation } from "@/lib/decision/schemas/candidateRecommendation.schema";
-import { dedupeByKey } from "@/lib/decision/utils/dedupeByKey";
-
-// Restricted, already-verified citable-evidence pool — the union of
-// evidence already cited by keyFindings, criticalRisks, and
-// investmentThesis.supportingEvidence, deduplicated by id
-// (MILESTONE_37_DESIGN.md Section 5, Option B). A recommendation can
-// only cite evidence some other already-verified facet already
-// touched — a deliberate, stronger traceability guarantee than the
-// raw aggregated pool Milestones 34-36 each use, accepted as an
-// intentional trade-off (Section 10): a real, non-fabricated
-// recommendation citing evidence outside this pool is still rejected.
-function computeCitableEvidence(
-  findings: Finding[],
-  criticalRisks: RiskFinding[],
-  investmentThesis: InvestmentThesis
-): Evidence[] {
-  const allEvidence = [
-    ...findings.flatMap((finding) => finding.evidence),
-    ...criticalRisks.flatMap((risk) => risk.evidence),
-    ...investmentThesis.supportingEvidence,
-  ];
-  return dedupeByKey(allEvidence, (item) => item.id);
-}
+import { computeCitableEvidence } from "@/lib/decision/evidence/citableEvidence";
 
 // Real generation, evidence-constrained end to end
 // (MILESTONE_37_DESIGN.md Section 5) — the fourth and last of the four
@@ -45,9 +22,13 @@ function computeCitableEvidence(
 //
 // Every candidate generateCandidateRecommendations() returns is
 // checked by verifyClaimTraceability() (Milestone 33, unmodified)
-// against the restricted citable pool above — a candidate that fails
-// is dropped entirely, never shown with a caveat (ATLAS_AI_V2_FINAL.md
-// Section 5). lib/business's own, unmodified buildRecommendation()
+// against the restricted citable pool computeCitableEvidence()
+// computes (relocated to lib/decision/evidence/citableEvidence.ts at
+// Milestone 38, so verdict/decisionVerdict.ts can share it — Minor
+// Finding 3, MILESTONE_38_DESIGN.md Section 5) — a candidate that
+// fails is dropped entirely, never shown with a caveat
+// (ATLAS_AI_V2_FINAL.md Section 5). lib/business's own, unmodified
+// buildRecommendation()
 // constructs the real Recommendation for every "matched" result;
 // requiredEvidence is populated with the real, verified evidence ids
 // the candidate's citations resolved to (see recommendation.schema.ts's

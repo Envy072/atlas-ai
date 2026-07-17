@@ -1,23 +1,47 @@
-import { Lightbulb, TrendingUp, TrendingDown, HelpCircle } from "lucide-react";
+import { Lightbulb, TrendingUp, TrendingDown, HelpCircle, Gavel } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import SectionHeader from "@/components/shared/SectionHeader";
 import IconBadge from "@/components/shared/IconBadge";
 import StringList from "@/components/shared/StringList";
 import { severityBadgeVariant } from "@/components/shared/severityTone";
-import type { DecisionProfile } from "@/lib/decision";
+import { formatPercent } from "@/lib/format";
+import type { DecisionProfile, DecisionVerdict, VerdictCategory } from "@/lib/decision";
 
 interface DecisionSummaryPanelProps {
   profile: DecisionProfile;
+  verdict?: DecisionVerdict;
 }
+
+const VERDICT_LABEL: Record<VerdictCategory, string> = {
+  pursue: "Pursue",
+  pursue_with_conditions: "Pursue, with conditions",
+  monitor: "Monitor",
+  pass: "Pass",
+};
+
+const VERDICT_BADGE_VARIANT: Record<VerdictCategory, "success" | "warning" | "info" | "destructive"> = {
+  pursue: "success",
+  pursue_with_conditions: "warning",
+  monitor: "info",
+  pass: "destructive",
+};
 
 // Renders DecisionProfile's own synthesized material — investment thesis
 // arguments, findings, and critical risks — exactly as lib/decision
-// produced it. Deliberately shows no verdict/score: investmentThesis
-// carries no conclusion field by its own design ("no generated
-// conclusion" — MILESTONE_14_DESIGN.md Section 4/16), only the raw
-// arguments a person weighs themselves.
-export default function DecisionSummaryPanel({ profile }: DecisionSummaryPanelProps) {
+// produced it. `verdict` (Milestone 38, additive, optional) is Atlas
+// AI's own Final Verdict — a real conclusion, mechanically confidence-
+// scored and evidence-traceable, computed by the caller via
+// lib/decision's buildDecisionArtifacts() and rendered here as this
+// panel's own last section (this file no longer shows "no
+// verdict/score": investmentThesis itself still carries no conclusion
+// field by its own design — "no generated conclusion" —
+// MILESTONE_14_DESIGN.md Section 4/16 — but the verdict is a distinct,
+// separately-computed artifact that DOES conclude, sitting alongside
+// the raw arguments a person can still weigh themselves). `undefined`
+// is an honest, legitimate state, rendered plainly, never a fabricated
+// placeholder.
+export default function DecisionSummaryPanel({ profile, verdict }: DecisionSummaryPanelProps) {
   const { businessSummary, investmentThesis, keyFindings, criticalRisks, strengths, weaknesses, opportunities, threats } =
     profile;
 
@@ -107,6 +131,29 @@ export default function DecisionSummaryPanel({ profile }: DecisionSummaryPanelPr
               </li>
             ))}
           </ul>
+        )}
+      </div>
+
+      <div>
+        <div className="mb-3 flex items-center gap-3">
+          <IconBadge icon={Gavel} bgClassName="bg-indigo-100" textClassName="text-indigo-600" size="sm" />
+          <h3 className="text-sm font-semibold text-foreground">Final verdict</h3>
+        </div>
+        {verdict ? (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={VERDICT_BADGE_VARIANT[verdict.category]}>{VERDICT_LABEL[verdict.category]}</Badge>
+              <Badge variant="outline">{formatPercent(verdict.confidence)} confidence</Badge>
+              <Badge variant="outline">
+                {verdict.supportingEvidence.length} supporting {verdict.supportingEvidence.length === 1 ? "source" : "sources"}
+              </Badge>
+            </div>
+            <p className="text-sm leading-7 text-foreground">{verdict.summary}</p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Not yet available — not enough real, evidence-backed material to assemble a verdict from yet.
+          </p>
         )}
       </div>
     </Card>

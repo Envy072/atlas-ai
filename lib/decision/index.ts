@@ -31,6 +31,12 @@ export {
 } from "@/lib/decision/recommendations/recommendationAggregator";
 export { deriveRecommendations } from "@/lib/decision/recommendations/recommendationGenerator";
 
+export {
+  buildDecisionVerdict,
+  deriveVerdict,
+} from "@/lib/decision/verdict/decisionVerdict";
+export { buildDecisionArtifacts } from "@/lib/decision/artifacts/decisionArtifacts";
+
 export { buildInvestmentMemo } from "@/lib/decision/memo/investmentMemo";
 export { buildDueDiligenceReport } from "@/lib/decision/diligence/dueDiligenceReport";
 export { buildExecutiveSummary } from "@/lib/decision/executive/executiveSummary";

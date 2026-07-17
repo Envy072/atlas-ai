@@ -3,9 +3,11 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/services/auth";
 import { getProjectById } from "@/lib/services/projects";
+import { buildDecisionArtifacts } from "@/lib/decision";
 import { formatRelativeTime } from "@/lib/format";
 import { H1, Small } from "@/components/ui/typography";
 import DecisionReport from "@/components/workspace/decision-report/DecisionReport";
+import DecisionArtifactLinks from "@/components/workspace/decision-report/DecisionArtifactLinks";
 
 interface ProjectDetailPageProps {
   params: Promise<{ id: string }>;
@@ -18,9 +20,13 @@ interface ProjectDetailPageProps {
 // pattern app/dashboard/analysis/page.tsx already relies on for the
 // same reason.
 //
-// Reuses DecisionReport unchanged: a Project's profile/verification
-// fields are exactly the already-validated shapes that component was
-// built to render for the live analysis flow.
+// Reuses DecisionReport: a Project's profile/verification fields are
+// exactly the already-validated shapes that component was built to
+// render for the live analysis flow. As of Milestone 38, this route
+// also calls buildDecisionArtifacts(project.profile) — the one shared
+// computation point for Decision Intelligence's recommendations and
+// verdict (lib/decision/artifacts/decisionArtifacts.ts) — and passes
+// the resulting verdict through to DecisionReport/DecisionSummaryPanel.
 //
 // getProjectById treats "doesn't exist," "malformed," and "belongs to
 // someone else" identically (a null return) — notFound() fires for all
@@ -40,6 +46,8 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
     notFound();
   }
 
+  const { verdict } = await buildDecisionArtifacts(project.profile);
+
   return (
     <div className="mx-auto max-w-5xl p-8">
       <Link
@@ -57,7 +65,9 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
         </Small>
       </div>
 
-      <DecisionReport profile={project.profile} verification={project.verification} />
+      <DecisionArtifactLinks projectId={project.id} />
+
+      <DecisionReport profile={project.profile} verification={project.verification} verdict={verdict} />
     </div>
   );
 }

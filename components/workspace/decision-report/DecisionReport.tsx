@@ -1,4 +1,4 @@
-import type { DecisionProfile } from "@/lib/decision";
+import type { DecisionProfile, DecisionVerdict } from "@/lib/decision";
 import type { VerificationSummary } from "@/lib/verification";
 import DecisionSummaryPanel from "@/components/workspace/decision-report/DecisionSummaryPanel";
 import TrustPanel from "@/components/workspace/decision-report/TrustPanel";
@@ -10,6 +10,7 @@ import FinancialIntelligenceCard from "@/components/workspace/decision-report/Fi
 interface DecisionReportProps {
   profile: DecisionProfile;
   verification: VerificationSummary;
+  verdict?: DecisionVerdict;
 }
 
 // Replaces AnalysisReport in the live flow (MILESTONE_14_DESIGN.md
@@ -42,7 +43,15 @@ interface DecisionReportProps {
 // something different in a $50M SAM than a $50B SAM). Trust first and
 // Decision Summary last are unchanged, established reasoning
 // (MILESTONE_14/15_DESIGN.md): evidence precedes conclusions.
-export default function DecisionReport({ profile, verification }: DecisionReportProps) {
+//
+// `verdict` (Milestone 38, additive, optional) — the Final Verdict,
+// computed by the caller via lib/decision's buildDecisionArtifacts()
+// and forwarded here unchanged into DecisionSummaryPanel, which
+// renders it as the last section of the whole report. `undefined` is
+// an honest, legitimate state (nothing to assemble a verdict from yet,
+// or generation degraded gracefully) — never coerced into a fabricated
+// placeholder.
+export default function DecisionReport({ profile, verification, verdict }: DecisionReportProps) {
   return (
     <div className="space-y-8">
       <TrustPanel verification={verification} />
@@ -50,7 +59,7 @@ export default function DecisionReport({ profile, verification }: DecisionReport
       <CompetitorIntelligenceCard competitors={profile.keyCompetitors} />
       <BusinessIntelligenceCard business={profile.businessProfile} />
       <FinancialIntelligenceCard financial={profile.financialProfile} />
-      <DecisionSummaryPanel profile={profile} />
+      <DecisionSummaryPanel profile={profile} verdict={verdict} />
     </div>
   );
 }

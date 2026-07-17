@@ -42,3 +42,14 @@ export type ReadinessLevel = z.infer<typeof ReadinessLevelSchema>;
 export const ThesisArgumentKindSchema = z.enum(["positive", "negative", "unknown", "contradiction"]);
 
 export type ThesisArgumentKind = z.infer<typeof ThesisArgumentKindSchema>;
+
+// The Final Verdict's own categorical conclusion
+// (MILESTONE_38_DESIGN.md Section 5) — four categories directly
+// answering the roadmap's own user-value framing: a genuinely strong
+// case maps to "pursue"; worth pursuing but conditional on named gaps
+// or risks maps to "pursue_with_conditions"; too little evidence or too
+// many unresolved contradictions maps to "monitor"; a clear negative
+// case maps to "pass".
+export const VerdictCategorySchema = z.enum(["pursue", "pursue_with_conditions", "monitor", "pass"]);
+
+export type VerdictCategory = z.infer<typeof VerdictCategorySchema>;

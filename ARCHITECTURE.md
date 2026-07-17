@@ -223,7 +223,7 @@ Response shape is exactly `AnalysisResultSchema` — the same schema the client 
 Not yet scheduled to a sprint; ordered roughly by leverage:
 
 1. **Unify the two analyze-idea implementations.** Either route `/dashboard` to the Zustand-backed `Workspace`/`Tabs` tree and retire `AIWorkspace`'s parallel implementation, or formally decide `AIWorkspace` is canonical and retire the orphaned tree. Currently both are maintained in parallel.
-2. **Surface the AI's unused output.** `strengths`, `weaknesses`, `risks`, `opportunities`, `next_steps`, `verdict`, `confidence`, `investment_decision`, and the four sub-scores are generated (and partly persisted) but never shown to a user on the live route.
+2. **Surface the AI's unused output.** `strengths`, `weaknesses`, `risks`, `opportunities`, `next_steps`, `verdict`, `confidence`, `investment_decision`, and the four sub-scores are generated (and partly persisted) but never shown to a user on the live route. (This whole document is a frozen Sprint 4 snapshot, predating the six-platform architecture entirely — the single-prompt pipeline it describes here was deleted at Milestone 25. Its own "verdict" is unrelated to the real, evidence-traceable `DecisionVerdict` Milestone 38 later shipped — see `DECISION_PLATFORM.md`'s "Verdict" section and `CLAUDE.md` Section 8.)
 3. **Fix `/competitors`.** It currently renders a copy of the `/projects` page.
 4. **Add a project detail route** (`/projects/[id]`) — the list currently has nowhere to link to.
 5. **Auth.** No session/user model exists; "Yasin / Founder" is hardcoded in the UI.

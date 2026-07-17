@@ -1,5 +1,3 @@
-"use client";
-
 import type { LucideIcon } from "lucide-react";
 
 type IconBadgeSize = "sm" | "md" | "lg";
