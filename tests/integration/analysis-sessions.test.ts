@@ -16,14 +16,46 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
+// Milestone 44's monthly-limit check: getUserTier()/countProjectsThisMonth()'s
+// own internal correctness is already covered by their real unit tests
+// (lib/services/stripe.test.ts, lib/services/projects.test.ts) — mocked
+// directly here so this file's job stays narrow: proving the route
+// itself composes them into the correct HTTP response, not
+// re-verifying their internals a second time. Every other export from
+// each module (including persistProjectFromSession, which the golden
+// path below still exercises for real) stays real via importOriginal.
+vi.mock("@/lib/services/stripe", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/stripe")>();
+  return { ...actual, getUserTier: vi.fn() };
+});
+vi.mock("@/lib/services/projects", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/projects")>();
+  return { ...actual, countProjectsThisMonth: vi.fn() };
+});
+
 import { createClient } from "@/lib/supabase/server";
+import { getUserTier } from "@/lib/services/stripe";
+import { countProjectsThisMonth } from "@/lib/services/projects";
 import { POST } from "@/app/api/analysis-sessions/route";
 import { GET } from "@/app/api/analysis-sessions/[id]/route";
+import type { User } from "@supabase/supabase-js";
 
 const mockedCreateClient = vi.mocked(createClient);
+const mockedGetUserTier = vi.mocked(getUserTier);
+const mockedCountProjectsThisMonth = vi.mocked(countProjectsThisMonth);
+
+const FAKE_USER: User = {
+  id: "user-1",
+  app_metadata: {},
+  user_metadata: {},
+  aud: "authenticated",
+  created_at: "2026-01-01T00:00:00.000Z",
+} as User;
 
 beforeEach(() => {
   mockedCreateClient.mockResolvedValue(createMockSupabaseClient({ user: null }));
+  mockedGetUserTier.mockReset();
+  mockedCountProjectsThisMonth.mockReset();
 });
 
 function buildCreateRequest(body: unknown): Request {
@@ -91,5 +123,37 @@ describe("POST /api/analysis-sessions → GET /api/analysis-sessions/:id", () =>
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.error).toBe('No analysis session found for id "session-does-not-exist".');
+  });
+
+  it("rejects a signed-in Free tier user who has reached the monthly analysis cap with 403", async () => {
+    mockedCreateClient.mockResolvedValue(createMockSupabaseClient({ user: FAKE_USER }));
+    mockedGetUserTier.mockResolvedValue("free");
+    mockedCountProjectsThisMonth.mockResolvedValue(2);
+
+    const response = await POST(buildCreateRequest({ startupIdea: "One idea too many this month." }));
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toBe("You've reached your Free tier's monthly analysis limit.");
+  });
+
+  it("still creates a session for a signed-in Free tier user under the monthly cap", async () => {
+    mockedCreateClient.mockResolvedValue(createMockSupabaseClient({ user: FAKE_USER }));
+    mockedGetUserTier.mockResolvedValue("free");
+    mockedCountProjectsThisMonth.mockResolvedValue(1);
+
+    const response = await POST(buildCreateRequest({ startupIdea: "Still within this month's limit." }));
+
+    expect(response.status).toBe(201);
+  });
+
+  it("never checks the monthly cap for a signed-in Founder tier user", async () => {
+    mockedCreateClient.mockResolvedValue(createMockSupabaseClient({ user: FAKE_USER }));
+    mockedGetUserTier.mockResolvedValue("founder");
+
+    const response = await POST(buildCreateRequest({ startupIdea: "Founders are unlimited." }));
+
+    expect(response.status).toBe(201);
+    expect(mockedCountProjectsThisMonth).not.toHaveBeenCalled();
   });
 });

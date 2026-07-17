@@ -5,6 +5,8 @@ import {
   ExternalServiceError,
   InvalidRequestError,
   UnauthorizedError,
+  WebhookVerificationError,
+  UsageLimitExceededError,
   getErrorMessage,
   getErrorStatus,
 } from "@/lib/errors";
@@ -72,6 +74,24 @@ describe("UnauthorizedError", () => {
 
   it("accepts a custom message", () => {
     expect(new UnauthorizedError("Nope.").message).toBe("Nope.");
+  });
+});
+
+describe("WebhookVerificationError", () => {
+  it("defaults to status 400 and code 'webhook_verification_failed'", () => {
+    const error = new WebhookVerificationError();
+    expect(error.status).toBe(400);
+    expect(error.code).toBe("webhook_verification_failed");
+    expect(error).toBeInstanceOf(AppError);
+  });
+});
+
+describe("UsageLimitExceededError", () => {
+  it("defaults to status 403 and code 'usage_limit_exceeded'", () => {
+    const error = new UsageLimitExceededError();
+    expect(error.status).toBe(403);
+    expect(error.code).toBe("usage_limit_exceeded");
+    expect(error).toBeInstanceOf(AppError);
   });
 });
 

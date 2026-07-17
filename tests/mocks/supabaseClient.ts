@@ -18,6 +18,8 @@ export interface MockSupabaseClientOptions {
   selectResult?: MockSupabaseResult<unknown>;
   /** What the terminal `.insert()` call resolves to. */
   insertResult?: { error: MockSupabaseError | null };
+  /** What the terminal `.gte()` call resolves to (countProjectsThisMonth's count-mode select). */
+  countResult?: { count: number | null; error: MockSupabaseError | null };
 }
 
 // A small, hand-rolled mock implementing only the exact Supabase
@@ -44,12 +46,14 @@ export interface MockSupabaseClientOptions {
 export function createMockSupabaseClient(options: MockSupabaseClientOptions = {}): SupabaseClient {
   const selectResult = options.selectResult ?? { data: null, error: null };
   const insertResult = options.insertResult ?? { error: null };
+  const countResult = options.countResult ?? { count: 0, error: null };
 
   const eq = vi.fn(() => queryBuilder);
   const order = vi.fn(() => Promise.resolve(selectResult));
   const maybeSingle = vi.fn(() => Promise.resolve(selectResult));
+  const gte = vi.fn(() => Promise.resolve(countResult));
 
-  const queryBuilder = { eq, order, maybeSingle };
+  const queryBuilder = { eq, order, maybeSingle, gte };
 
   const select = vi.fn(() => queryBuilder);
   const insert = vi.fn(() => Promise.resolve(insertResult));

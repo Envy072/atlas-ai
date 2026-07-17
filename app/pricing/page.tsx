@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
+import { getCurrentUser } from "@/lib/services/auth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { H2, H3, Display, Body, Small, Caption } from "@/components/ui/typography";
@@ -16,20 +17,22 @@ interface PricingTier {
 // Free and Founder only — the real, current tiers (ATLAS_AI_V2_STRATEGY.md
 // Section 17). The "Builder" tier is deliberately not listed: its content
 // (the v3 Execution layer) doesn't exist yet (MILESTONE_43_DESIGN.md
-// Outside Scope). Founder's price ($29/mo) was the open range in that
-// same table ($29-39/mo) settled explicitly for this milestone, not
-// guessed.
+// Outside Scope). Founder's price is £29/month — the real Stripe
+// Product's own price (MILESTONE_44_DESIGN.md correction; the $29 figure
+// this page originally showed was settled from Milestone 43's open
+// $29-39 range before the real Stripe Product existed, in the wrong
+// currency).
 const TIERS: PricingTier[] = [
   {
     name: "Free",
-    price: "$0",
+    price: "£0",
     cadence: "forever",
     description: "Try Atlas AI on a real idea before committing to anything.",
     features: ["1-2 analyses per month", "Executive Summary only", "History kept for 30 days"],
   },
   {
     name: "Founder",
-    price: "$29",
+    price: "£29",
     cadence: "/month",
     description: "For founders who want the full picture, and want it to stick around.",
     features: [
@@ -41,16 +44,27 @@ const TIERS: PricingTier[] = [
   },
 ];
 
-// Reads a public env var so a real Stripe Payment Link (created directly
-// in the Stripe Dashboard, not by this app's own code — Milestone 44
-// owns any real Stripe integration) can be dropped in without a code
-// change. Unset today, honestly — no Payment Link exists yet in this
-// environment, so the Founder CTA below renders a disabled, honest
-// "coming soon" state rather than a dead or fabricated link
-// (MILESTONE_43_DESIGN.md, Founder CTA decision).
+// Reads a public env var so the real Stripe Payment Link (created
+// directly in the Stripe Dashboard, not by this app's own code) can be
+// dropped in without a code change. As of Milestone 44, this is real
+// and configured.
 const FOUNDER_PAYMENT_LINK_URL = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK_URL;
 
-export default function PricingPage() {
+// Appends Stripe Checkout's own client_reference_id parameter — how
+// this codebase correlates a completed payment back to a real Atlas AI
+// account in the webhook handler (MILESTONE_44_DESIGN.md Webhook
+// Design, "the correlation problem"). Stripe Payment Links honor this
+// query parameter and carry it through to the resulting Checkout
+// Session unmodified.
+function buildFounderCheckoutUrl(paymentLinkUrl: string, userId: string): string {
+  const url = new URL(paymentLinkUrl);
+  url.searchParams.set("client_reference_id", userId);
+  return url.toString();
+}
+
+export default async function PricingPage() {
+  const user = await getCurrentUser();
+
   return (
     <main className="min-h-screen bg-white">
       <Navbar />
@@ -89,17 +103,24 @@ export default function PricingPage() {
                   <Button className="w-full" variant="secondary" render={<Link href="/signup" />}>
                     Get started free
                   </Button>
-                ) : FOUNDER_PAYMENT_LINK_URL ? (
-                  <Button className="w-full" render={<Link href={FOUNDER_PAYMENT_LINK_URL} />}>
-                    Get Founder
-                  </Button>
-                ) : (
+                ) : !FOUNDER_PAYMENT_LINK_URL ? (
                   <div className="space-y-2">
                     <Button className="w-full" disabled>
                       Get Founder
                     </Button>
                     <Caption className="text-center">Payment link coming soon.</Caption>
                   </div>
+                ) : user ? (
+                  <Button className="w-full" render={<Link href={buildFounderCheckoutUrl(FOUNDER_PAYMENT_LINK_URL, user.id)} />}>
+                    Get Founder
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full"
+                    render={<Link href={`/login?redirectTo=${encodeURIComponent("/pricing")}`} />}
+                  >
+                    Sign in to get Founder
+                  </Button>
                 )}
               </div>
             </Card>

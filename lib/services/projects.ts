@@ -121,6 +121,31 @@ export async function getProjectById(id: string, userId: string): Promise<Projec
   return fromRow(data as ProjectRow);
 }
 
+// Backs the Free tier's monthly analysis cap (MILESTONE_44_DESIGN.md
+// Scope) — a calendar-month count, not a rolling 30-day window, matching
+// how "2 analyses per month" reads most naturally. Only ever called for
+// a signed-in user (getUserTier() already gates this at the one call
+// site, app/api/analysis-sessions/route.ts) — Milestone 27's approved
+// anonymous-analysis decision has no user id to count against and stays
+// entirely unmetered, unchanged.
+export async function countProjectsThisMonth(userId: string, now: Date): Promise<number> {
+  const supabase = await createClient();
+  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+
+  const { count, error } = await supabase
+    .from("projects")
+    .select("*", { count: "exact", head: true })
+    .eq("owner_id", userId)
+    .gte("created_at", startOfMonth);
+
+  if (error) {
+    console.error("Supabase Error:", error);
+    return 0;
+  }
+
+  return count ?? 0;
+}
+
 // The one and only write path for the `projects` table
 // (MILESTONE_26_DESIGN.md Section 3.5). Called from
 // lib/services/analysisSessions.ts's session-view composition — the

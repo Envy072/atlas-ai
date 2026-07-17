@@ -63,6 +63,30 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+// A Stripe webhook request's signature didn't verify — the entire
+// security model for app/api/webhooks/stripe/route.ts
+// (MILESTONE_44_DESIGN.md Security Considerations). Rejected before any
+// database write is attempted.
+export class WebhookVerificationError extends AppError {
+  constructor(message = "Webhook signature verification failed.") {
+    super(message, { status: 400, code: "webhook_verification_failed" });
+    this.name = "WebhookVerificationError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+// A signed-in Free-tier user has reached their monthly analysis cap
+// (MILESTONE_44_DESIGN.md Scope — enforced free-tier limits). Never
+// thrown for an anonymous caller: Milestone 27's approved "anonymous
+// users may run an analysis" decision is unmetered and unchanged.
+export class UsageLimitExceededError extends AppError {
+  constructor(message = "You've reached your Free tier's monthly analysis limit.") {
+    super(message, { status: 403, code: "usage_limit_exceeded" });
+    this.name = "UsageLimitExceededError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;

@@ -13,7 +13,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import { createClient } from "@/lib/supabase/server";
-import { listProjects, getProjectById, persistProjectFromSession } from "@/lib/services/projects";
+import { listProjects, getProjectById, persistProjectFromSession, countProjectsThisMonth } from "@/lib/services/projects";
 
 const mockedCreateClient = vi.mocked(createClient);
 
@@ -200,6 +200,43 @@ describe("getProjectById", () => {
       profile: row.profile,
       verification: row.verification,
     });
+  });
+});
+
+// countProjectsThisMonth's first tests (Milestone 44) — backs the Free
+// tier's monthly analysis cap.
+describe("countProjectsThisMonth", () => {
+  it("scopes the query to owner_id and a calendar-month-start lower bound", async () => {
+    const client = createMockSupabaseClient({ countResult: { count: 0, error: null } });
+    mockedCreateClient.mockResolvedValue(client);
+    const now = new Date("2026-07-17T12:00:00.000Z");
+
+    await countProjectsThisMonth("user-1", now);
+
+    const fromReturn = vi.mocked(client.from).mock.results[0]?.value;
+    const selectReturn = vi.mocked(fromReturn.select).mock.results[0]?.value;
+    expect(selectReturn.eq).toHaveBeenCalledWith("owner_id", "user-1");
+    expect(selectReturn.eq.mock.results[0]?.value.gte).toHaveBeenCalledWith("created_at", "2026-07-01T00:00:00.000Z");
+  });
+
+  it("returns the real count on success", async () => {
+    mockedCreateClient.mockResolvedValue(
+      createMockSupabaseClient({ countResult: { count: 2, error: null } })
+    );
+
+    expect(await countProjectsThisMonth("user-1", new Date("2026-07-17T00:00:00.000Z"))).toBe(2);
+  });
+
+  it("returns 0 (not a throw) and logs when Supabase itself returns an error", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockedCreateClient.mockResolvedValue(
+      createMockSupabaseClient({ countResult: { count: null, error: { message: "connection lost" } } })
+    );
+
+    expect(await countProjectsThisMonth("user-1", new Date("2026-07-17T00:00:00.000Z"))).toBe(0);
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
   });
 });
 
