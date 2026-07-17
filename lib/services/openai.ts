@@ -111,7 +111,8 @@ Rules, followed exactly:
 ${Object.entries(FINDING_CATEGORY_DESCRIPTIONS)
   .map(([category, description]) => `   - ${category}: ${description}`)
   .join("\n")}
-5. Each finding also needs: a severity ("low", "medium", or "high"), a confidence score from 0-100 reflecting how directly the cited evidence supports the claim, a one-sentence summary, and the list of evidence ids it is based on.`;
+5. Each finding also needs: a severity ("low", "medium", or "high"), a confidence score from 0-100 reflecting how directly the cited evidence supports the claim, a one-sentence summary, and the list of evidence ids it is based on.
+6. Cite only evidence that specifically discusses this startup's own market, product, or customers — not a topically adjacent or different one. Evidence about a different company, product category, or customer segment is not a valid basis for a finding about this idea, even if it happens to be genuine, real evidence.`;
 
 // Selects the most relevant, bounded slice of evidence to send —
 // highest Source.confidence first (a real signal already computed by
@@ -172,7 +173,8 @@ Rules, followed exactly:
 ${Object.entries(FINDING_CATEGORY_DESCRIPTIONS)
   .map(([category, description]) => `   - ${category}: ${description}`)
   .join("\n")}
-5. Each risk also needs: a severity ("critical", "high", "medium", or "low" — "critical" reserved for a genuine, evidence-backed reason this idea could fail outright, not routine execution risk), a confidence score from 0-100 reflecting how directly the cited evidence supports the risk, a one-sentence summary, and the list of evidence ids it is based on.`;
+5. Each risk also needs: a severity ("critical", "high", "medium", or "low" — "critical" reserved for a genuine, evidence-backed reason this idea could fail outright, not routine execution risk), a confidence score from 0-100 reflecting how directly the cited evidence supports the risk, a one-sentence summary, and the list of evidence ids it is based on.
+6. Cite only evidence that specifically discusses this startup's own market, product, or customers — not a topically adjacent or different one. Evidence about a different company, product category, or customer segment is not a valid basis for a risk about this idea, even if it happens to be genuine, real evidence.`;
 
 // A third, again deliberately distinct system prompt — a thesis
 // argument is neither a neutral finding nor a risk; it is one of four
@@ -195,7 +197,8 @@ Rules, followed exactly:
    - negative: a real, evidence-backed reason this idea could struggle
    - unknown: a real ambiguity RAISED BY the evidence you were given — the evidence says something, but doesn't fully resolve it. Do NOT use "unknown" for a topic the evidence simply never mentions at all — a total absence of evidence on a topic is not an argument for this thesis; leave it out entirely.
    - contradiction: a real conflict between two or more pieces of evidence
-5. Each argument also needs a one-sentence summary and the list of evidence ids it is based on.`;
+5. Each argument also needs a one-sentence summary and the list of evidence ids it is based on.
+6. Cite only evidence that specifically discusses this startup's own market, product, or customers — not a topically adjacent or different one. Evidence about a different company, product category, or customer segment is not a valid basis for an argument about this idea, even if it happens to be genuine, real evidence.`;
 
 // Business-action categories a Recommendation may fall under — reused
 // verbatim from @/lib/business's own RecommendationCategorySchema
@@ -230,7 +233,8 @@ Rules, followed exactly:
 ${Object.entries(RECOMMENDATION_CATEGORY_DESCRIPTIONS)
   .map(([category, description]) => `   - ${category}: ${description}`)
   .join("\n")}
-5. Each recommendation also needs: a priority ("low", "medium", "high", or "urgent" — "urgent" reserved for something a founder should act on immediately, not routine advice), a confidence score from 0-100, a one-sentence reason, and the list of evidence ids it is based on.`;
+5. Each recommendation also needs: a priority ("low", "medium", "high", or "urgent" — "urgent" reserved for something a founder should act on immediately, not routine advice), a confidence score from 0-100, a one-sentence reason, and the list of evidence ids it is based on.
+6. Cite only evidence that specifically discusses this startup's own market, product, or customers — not a topically adjacent or different one. Evidence about a different company, product category, or customer segment is not a valid basis for a recommendation about this idea, even if it happens to be genuine, real evidence.`;
 
 // A fifth, again deliberately distinct system prompt — the verdict is
 // the one artifact assembled from all four prior facets at once
@@ -255,7 +259,8 @@ Rules, followed exactly:
    - pursue_with_conditions: worth pursuing, but conditional on specific, named gaps or risks being addressed
    - monitor: too little evidence, or too many unresolved contradictions, to reach a confident view yet
    - pass: the evidence supports a clear negative case
-5. Write a one-paragraph, readable summary explaining the verdict in plain language, and the list of evidence ids it is based on. Do not invent a confidence score — that is computed separately, not part of your own output.`;
+5. Write a one-paragraph, readable summary explaining the verdict in plain language, and the list of evidence ids it is based on. Do not invent a confidence score — that is computed separately, not part of your own output.
+6. Cite only evidence that specifically discusses this startup's own market, product, or customers — not a topically adjacent or different one. Evidence about a different company, product category, or customer segment is not a valid basis for this verdict, even if it happens to be genuine, real evidence.`;
 
 function formatFindingsForPrompt(findings: Finding[]): string {
   return findings

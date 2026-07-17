@@ -4,7 +4,8 @@ import type { InvestmentThesis } from "@/lib/decision/schemas/thesis.schema";
 import type { Recommendation } from "@/lib/business";
 import { buildRecommendation } from "@/lib/business";
 import { sortRecommendationsByPriority } from "@/lib/decision/recommendations/recommendationAggregator";
-import { verifyClaimTraceability } from "@/lib/decision/traceability/claimVerifier";
+import { verifyClaim, tallyClaimVerificationResults } from "@/lib/decision/traceability/claimVerifier";
+import type { ClaimVerificationResult } from "@/lib/decision/traceability/claimVerifier";
 import { generateCandidateRecommendations } from "@/lib/services/openai";
 import type { CandidateRecommendation } from "@/lib/decision/schemas/candidateRecommendation.schema";
 import { computeCitableEvidence } from "@/lib/decision/evidence/citableEvidence";
@@ -21,8 +22,8 @@ import { computeCitableEvidence } from "@/lib/decision/evidence/citableEvidence"
 // parameter — unchanged by this milestone).
 //
 // Every candidate generateCandidateRecommendations() returns is
-// checked by verifyClaimTraceability() (Milestone 33, unmodified)
-// against the restricted citable pool computeCitableEvidence()
+// checked by verifyClaim() (Milestone 40 — traceability, unmodified,
+// then relevance) against the restricted citable pool computeCitableEvidence()
 // computes (relocated to lib/decision/evidence/citableEvidence.ts at
 // Milestone 38, so verdict/decisionVerdict.ts can share it — Minor
 // Finding 3, MILESTONE_38_DESIGN.md Section 5) — a candidate that
@@ -73,8 +74,10 @@ export async function deriveRecommendations(
   }
 
   const recommendations: Recommendation[] = [];
+  const verifications: ClaimVerificationResult[] = [];
   for (const candidate of candidates) {
-    const verification = verifyClaimTraceability(candidate, citableEvidence);
+    const verification = await verifyClaim(candidate, citableEvidence);
+    verifications.push(verification);
     if (verification.status !== "matched") continue;
 
     recommendations.push(
@@ -87,6 +90,8 @@ export async function deriveRecommendations(
       })
     );
   }
+
+  console.info("[claimVerification]", { facet: "recommendations", ...tallyClaimVerificationResults(verifications) });
 
   return sortRecommendationsByPriority(recommendations);
 }

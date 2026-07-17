@@ -28,7 +28,7 @@ function buildEvidence(id: string): Evidence {
   return {
     id,
     claim: `Claim for ${id}`,
-    evidence: `Supporting text for ${id}`,
+    evidence: `Supporting evidence for a real recommendation point, from ${id}.`,
     confidence: 80,
     source: {
       id: `source_${id}`,

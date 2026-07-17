@@ -8,7 +8,7 @@ import type { DecisionVerdict } from "@/lib/decision/schemas/verdict.schema";
 import { DecisionVerdictSchema } from "@/lib/decision/schemas/verdict.schema";
 import type { CandidateVerdict } from "@/lib/decision/schemas/candidateVerdict.schema";
 import { parseOrThrow } from "@/lib/validation/parse";
-import { verifyClaimTraceability } from "@/lib/decision/traceability/claimVerifier";
+import { verifyClaim, tallyClaimVerificationResults } from "@/lib/decision/traceability/claimVerifier";
 import { generateCandidateVerdict } from "@/lib/services/openai";
 import { computeCitableEvidence } from "@/lib/decision/evidence/citableEvidence";
 
@@ -127,7 +127,8 @@ export async function deriveVerdict(
     return undefined;
   }
 
-  const verification = verifyClaimTraceability(candidate, citableEvidence);
+  const verification = await verifyClaim(candidate, citableEvidence);
+  console.info("[claimVerification]", { facet: "verdict", ...tallyClaimVerificationResults([verification]) });
   if (verification.status !== "matched") return undefined;
 
   return buildDecisionVerdict({

@@ -2,7 +2,8 @@ import type { Evidence } from "@/lib/research";
 import type { InvestmentThesis } from "@/lib/decision/schemas/thesis.schema";
 import { InvestmentThesisSchema } from "@/lib/decision/schemas/thesis.schema";
 import { parseOrThrow } from "@/lib/validation/parse";
-import { verifyClaimTraceability } from "@/lib/decision/traceability/claimVerifier";
+import { verifyClaim, tallyClaimVerificationResults } from "@/lib/decision/traceability/claimVerifier";
+import type { ClaimVerificationResult } from "@/lib/decision/traceability/claimVerifier";
 import { generateCandidateThesisArguments } from "@/lib/services/openai";
 import type { CandidateThesisArgument } from "@/lib/decision/schemas/candidateThesisArgument.schema";
 import { dedupeByKey } from "@/lib/decision/utils/dedupeByKey";
@@ -56,9 +57,9 @@ export function deriveEmptyThesis(): InvestmentThesis {
 // argument's resolvedEvidence is unioned into one shared pool,
 // deduplicated by Evidence.id via the already-existing dedupeByKey()
 // (reused unmodified, not a new hand-rolled dedup routine). A
-// candidate that fails verifyClaimTraceability() (Milestone 33,
-// unmodified) is dropped entirely, never shown with a caveat
-// (ATLAS_AI_V2_FINAL.md Section 5).
+// candidate that fails verifyClaim() (Milestone 40 — traceability,
+// unmodified, then relevance) is dropped entirely, never shown with a
+// caveat (ATLAS_AI_V2_FINAL.md Section 5).
 //
 // Graceful degradation: a generation failure, or zero input evidence,
 // degrades to deriveEmptyThesis()'s exact honest-empty shape — the
@@ -84,9 +85,11 @@ export async function deriveInvestmentThesis(
   const unknowns: string[] = [];
   const contradictions: string[] = [];
   const matchedEvidence: Evidence[] = [];
+  const verifications: ClaimVerificationResult[] = [];
 
   for (const candidate of candidates) {
-    const verification = verifyClaimTraceability(candidate, evidence);
+    const verification = await verifyClaim(candidate, evidence);
+    verifications.push(verification);
     if (verification.status !== "matched") continue;
 
     switch (candidate.kind) {
@@ -105,6 +108,8 @@ export async function deriveInvestmentThesis(
     }
     matchedEvidence.push(...verification.resolvedEvidence);
   }
+
+  console.info("[claimVerification]", { facet: "investmentThesis", ...tallyClaimVerificationResults(verifications) });
 
   return buildInvestmentThesis({
     positiveArguments,

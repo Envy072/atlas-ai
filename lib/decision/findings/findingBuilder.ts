@@ -4,7 +4,8 @@ import type { Finding } from "@/lib/decision/schemas/finding.schema";
 import { FindingSchema } from "@/lib/decision/schemas/finding.schema";
 import type { FindingCategory } from "@/lib/decision/schemas/enums";
 import { parseOrThrow } from "@/lib/validation/parse";
-import { verifyClaimTraceability } from "@/lib/decision/traceability/claimVerifier";
+import { verifyClaim, tallyClaimVerificationResults } from "@/lib/decision/traceability/claimVerifier";
+import type { ClaimVerificationResult } from "@/lib/decision/traceability/claimVerifier";
 import { generateCandidateFindings } from "@/lib/services/openai";
 import type { CandidateFinding } from "@/lib/decision/schemas/candidateFinding.schema";
 
@@ -42,11 +43,11 @@ export function buildFinding(input: BuildFindingInput): Finding {
 
 // Real generation, evidence-constrained end to end
 // (MILESTONE_34_DESIGN.md Section 5). Every candidate
-// generateCandidateFindings() returns is checked by
-// verifyClaimTraceability() (Milestone 33, unmodified) before it can
-// ever become a real Finding via buildFinding() (unmodified since
-// Milestone 10) — a candidate that fails is dropped entirely, never
-// shown with a caveat (ATLAS_AI_V2_FINAL.md Section 5).
+// generateCandidateFindings() returns is checked by verifyClaim()
+// (Milestone 40 — traceability, unmodified, then relevance) before it
+// can ever become a real Finding via buildFinding() (unmodified since
+// Milestone 10) — a candidate that fails either gate is dropped
+// entirely, never shown with a caveat (ATLAS_AI_V2_FINAL.md Section 5).
 //
 // Graceful degradation: a generation failure is logged and degrades to
 // [] rather than failing the entire six-stage pipeline over a
@@ -65,9 +66,11 @@ export async function deriveFindings(startupIdea: string, evidence: Evidence[]):
   }
 
   const findings: Finding[] = [];
+  const verifications: ClaimVerificationResult[] = [];
 
   for (const candidate of candidates) {
-    const verification = verifyClaimTraceability(candidate, evidence);
+    const verification = await verifyClaim(candidate, evidence);
+    verifications.push(verification);
     if (verification.status !== "matched") continue;
 
     findings.push(
@@ -80,6 +83,8 @@ export async function deriveFindings(startupIdea: string, evidence: Evidence[]):
       })
     );
   }
+
+  console.info("[claimVerification]", { facet: "findings", ...tallyClaimVerificationResults(verifications) });
 
   return findings;
 }

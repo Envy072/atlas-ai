@@ -3,7 +3,8 @@ import type { RiskFinding } from "@/lib/decision/schemas/riskFinding.schema";
 import { RiskFindingSchema } from "@/lib/decision/schemas/riskFinding.schema";
 import type { FindingCategory, RedFlagSeverity } from "@/lib/decision/schemas/enums";
 import { parseOrThrow } from "@/lib/validation/parse";
-import { verifyClaimTraceability } from "@/lib/decision/traceability/claimVerifier";
+import { verifyClaim, tallyClaimVerificationResults } from "@/lib/decision/traceability/claimVerifier";
+import type { ClaimVerificationResult } from "@/lib/decision/traceability/claimVerifier";
 import { generateCandidateRisks } from "@/lib/services/openai";
 import type { CandidateRisk } from "@/lib/decision/schemas/candidateRisk.schema";
 
@@ -46,13 +47,13 @@ export function buildRiskFinding(input: BuildRiskFindingInput): RiskFinding {
 // (MILESTONE_35_DESIGN.md Section 5) — the second of the four
 // Checkpoint B generation functions, structurally identical to
 // deriveFindings() (Milestone 34). Every candidate
-// generateCandidateRisks() returns is checked by
-// verifyClaimTraceability() (Milestone 33, unmodified) before it can
-// ever become a real RiskFinding via buildRiskFinding() (unmodified) —
-// a candidate that fails is dropped entirely, never shown with a
-// caveat (ATLAS_AI_V2_FINAL.md Section 5). verification.resolvedEvidence
-// is guaranteed non-empty for a "matched" result
-// (MILESTONE_35_DESIGN.md Section 4.2), so it satisfies
+// generateCandidateRisks() returns is checked by verifyClaim()
+// (Milestone 40 — traceability, unmodified, then relevance) before it
+// can ever become a real RiskFinding via buildRiskFinding()
+// (unmodified) — a candidate that fails either gate is dropped
+// entirely, never shown with a caveat (ATLAS_AI_V2_FINAL.md Section 5).
+// verification.resolvedEvidence is guaranteed non-empty for a "matched"
+// result (MILESTONE_35_DESIGN.md Section 4.2), so it satisfies
 // buildRiskFinding()'s required, non-optional `evidence` field with no
 // length check needed.
 //
@@ -72,9 +73,11 @@ export async function deriveCriticalRisks(startupIdea: string, evidence: Evidenc
   }
 
   const risks: RiskFinding[] = [];
+  const verifications: ClaimVerificationResult[] = [];
 
   for (const candidate of candidates) {
-    const verification = verifyClaimTraceability(candidate, evidence);
+    const verification = await verifyClaim(candidate, evidence);
+    verifications.push(verification);
     if (verification.status !== "matched") continue;
 
     risks.push(
@@ -87,6 +90,8 @@ export async function deriveCriticalRisks(startupIdea: string, evidence: Evidenc
       })
     );
   }
+
+  console.info("[claimVerification]", { facet: "criticalRisks", ...tallyClaimVerificationResults(verifications) });
 
   return risks;
 }
