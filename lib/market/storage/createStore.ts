@@ -1,16 +1,16 @@
 import type { MarketKnowledgeStore } from "@/lib/market/types/storage";
 import { MemoryMarketStore } from "@/lib/market/storage/memoryStore";
 import { SupabaseMarketStore } from "@/lib/market/storage/supabaseStore";
-import { PostgresMarketStore } from "@/lib/market/storage/postgresStore";
-import { AnalyticalWarehouseMarketStore } from "@/lib/market/storage/warehouseStore";
 
-export type MarketStoreBackend = "memory" | "supabase" | "postgres" | "warehouse";
+// Milestone 50 — the raw-Postgres and Warehouse backends were both
+// always "ARCHITECTURE ONLY" (every method threw "not implemented
+// yet"), had zero live callers anywhere, and were never the roadmap's
+// chosen future direction (Supabase is) — retired, not replaced.
+export type MarketStoreBackend = "memory" | "supabase";
 
 export interface CreateMarketStoreOptions {
   backend?: MarketStoreBackend;
   supabaseTableName?: string;
-  postgresConnectionString?: string;
-  warehouseDatasetName?: string;
 }
 
 // The single place that decides which MarketKnowledgeStore implementation
@@ -26,10 +26,6 @@ export function createStore(options: CreateMarketStoreOptions = {}): MarketKnowl
       return new MemoryMarketStore();
     case "supabase":
       return new SupabaseMarketStore(options.supabaseTableName);
-    case "postgres":
-      return new PostgresMarketStore(options.postgresConnectionString ?? "");
-    case "warehouse":
-      return new AnalyticalWarehouseMarketStore(options.warehouseDatasetName);
     default: {
       const exhaustiveCheck: never = backend;
       throw new Error(`Unknown market store backend: ${exhaustiveCheck}`);

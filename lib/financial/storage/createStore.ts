@@ -1,16 +1,16 @@
 import type { FinancialKnowledgeStore } from "@/lib/financial/types/storage";
 import { MemoryFinancialStore } from "@/lib/financial/storage/memoryStore";
 import { SupabaseFinancialStore } from "@/lib/financial/storage/supabaseStore";
-import { PostgresFinancialStore } from "@/lib/financial/storage/postgresStore";
-import { AnalyticalWarehouseFinancialStore } from "@/lib/financial/storage/warehouseStore";
 
-export type FinancialStoreBackend = "memory" | "supabase" | "postgres" | "warehouse";
+// Milestone 50 — the raw-Postgres and Warehouse backends were both
+// always "ARCHITECTURE ONLY" (every method threw "not implemented
+// yet"), had zero live callers anywhere, and were never the roadmap's
+// chosen future direction (Supabase is) — retired, not replaced.
+export type FinancialStoreBackend = "memory" | "supabase";
 
 export interface CreateFinancialStoreOptions {
   backend?: FinancialStoreBackend;
   supabaseTableName?: string;
-  postgresConnectionString?: string;
-  warehouseDatasetName?: string;
 }
 
 // The single place that decides which FinancialKnowledgeStore
@@ -26,10 +26,6 @@ export function createStore(options: CreateFinancialStoreOptions = {}): Financia
       return new MemoryFinancialStore();
     case "supabase":
       return new SupabaseFinancialStore(options.supabaseTableName);
-    case "postgres":
-      return new PostgresFinancialStore(options.postgresConnectionString ?? "");
-    case "warehouse":
-      return new AnalyticalWarehouseFinancialStore(options.warehouseDatasetName);
     default: {
       const exhaustiveCheck: never = backend;
       throw new Error(`Unknown financial store backend: ${exhaustiveCheck}`);

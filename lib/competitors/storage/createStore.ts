@@ -1,15 +1,20 @@
 import type { CompetitorKnowledgeStore } from "@/lib/competitors/types/storage";
 import { MemoryCompetitorStore } from "@/lib/competitors/storage/memoryStore";
 import { SupabaseCompetitorStore } from "@/lib/competitors/storage/supabaseStore";
-import { PostgresCompetitorStore } from "@/lib/competitors/storage/postgresStore";
 import { VectorDbCompetitorStore } from "@/lib/competitors/storage/vectorStore";
 
-export type CompetitorStoreBackend = "memory" | "supabase" | "postgres" | "vector";
+// Milestone 50 — the raw-Postgres backend was "ARCHITECTURE ONLY"
+// (every method threw "not implemented yet"), had zero live callers
+// anywhere, and was never the roadmap's chosen future direction
+// (Supabase is) — retired, not replaced. "vector" is untouched: a
+// different, still-intended future capability (semantic search) the
+// roadmap's own "retiring raw Postgres and the speculative Warehouse
+// variant" scope doesn't name.
+export type CompetitorStoreBackend = "memory" | "supabase" | "vector";
 
 export interface CreateStoreOptions {
   backend?: CompetitorStoreBackend;
   supabaseTableName?: string;
-  postgresConnectionString?: string;
   vectorCollectionName?: string;
 }
 
@@ -27,8 +32,6 @@ export function createStore(options: CreateStoreOptions = {}): CompetitorKnowled
       return new MemoryCompetitorStore();
     case "supabase":
       return new SupabaseCompetitorStore(options.supabaseTableName);
-    case "postgres":
-      return new PostgresCompetitorStore(options.postgresConnectionString ?? "");
     case "vector":
       return new VectorDbCompetitorStore(options.vectorCollectionName);
     default: {

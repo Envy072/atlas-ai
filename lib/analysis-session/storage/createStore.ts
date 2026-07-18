@@ -1,16 +1,16 @@
 import type { AnalysisSessionStore } from "@/lib/analysis-session/types/storage";
 import { MemoryAnalysisSessionStore } from "@/lib/analysis-session/storage/memoryStore";
 import { SupabaseAnalysisSessionStore } from "@/lib/analysis-session/storage/supabaseStore";
-import { PostgresAnalysisSessionStore } from "@/lib/analysis-session/storage/postgresStore";
-import { KnowledgeWarehouseAnalysisSessionStore } from "@/lib/analysis-session/storage/warehouseStore";
 
-export type AnalysisSessionStoreBackend = "memory" | "supabase" | "postgres" | "warehouse";
+// Milestone 50 — the raw-Postgres and Warehouse backends were both
+// always "ARCHITECTURE ONLY" (every method threw "not implemented
+// yet"), had zero live callers anywhere, and were never the roadmap's
+// chosen future direction (Supabase is) — retired, not replaced.
+export type AnalysisSessionStoreBackend = "memory" | "supabase";
 
 export interface CreateAnalysisSessionStoreOptions {
   backend?: AnalysisSessionStoreBackend;
   supabaseTableName?: string;
-  postgresConnectionString?: string;
-  warehouseDatasetName?: string;
 }
 
 // The single place that decides which AnalysisSessionStore
@@ -27,10 +27,6 @@ export function createStore(
       return new MemoryAnalysisSessionStore();
     case "supabase":
       return new SupabaseAnalysisSessionStore(options.supabaseTableName);
-    case "postgres":
-      return new PostgresAnalysisSessionStore(options.postgresConnectionString ?? "");
-    case "warehouse":
-      return new KnowledgeWarehouseAnalysisSessionStore(options.warehouseDatasetName);
     default: {
       const exhaustiveCheck: never = backend;
       throw new Error(`Unknown analysis session store backend: ${exhaustiveCheck}`);

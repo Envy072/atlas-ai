@@ -690,6 +690,33 @@ smaller Milestone count.
   release gate (Milestone 46) does not permit a public announcement
   before this.
 
+### Post-Launch Technical Debt
+
+**Milestone 50 — Storage Consolidation**
+- *(Not part of any of the five phases above — this is the first of
+  Section 12's own "deliberately waits until after Version 2 ships in
+  full" technical-debt items, now unblocked since Phases 1-5 and
+  Milestone 49 are all genuinely complete.)*
+- Mission: remove the never-implemented raw-Postgres and Warehouse
+  storage backends across every knowledge platform, leaving exactly
+  Memory (real) + Supabase (the documented future direction) everywhere.
+- Scope: `postgresStore.ts`/`warehouseStore.ts` deleted from
+  `analysis-session`, `business`, `decision`, `financial`, `market`,
+  `pipeline` (6 platforms had both); `competitors` had only
+  `postgresStore.ts` (its `vectorStore.ts` — a different, still-intended
+  future capability — is untouched). Each platform's `createStore.ts`/
+  `index.ts` updated to match. Confirmed via exhaustive reference check
+  (dynamic imports, alias-based imports, higher-level barrel
+  re-exports) that zero external consumers existed anywhere.
+- **Outside scope**: the other two items Section 12 names under the
+  same "deliberately waits" heading — the `dedupeByKey`/
+  `urlNormalization` debt (~5 copies) and extending the Milestone 30
+  test pattern to the other five knowledge platforms — remain
+  deferred, unscoped, real future work, not touched here.
+- Dependencies: Phase 5 and Milestone 49 both complete (Section 12's
+  own gate).
+- Delivered: commit (pending).
+
 ---
 
 ## 8. Engineering Priorities — Ordered by Leverage
@@ -721,11 +748,11 @@ of effort, for the founder:**
 9. Idea comparison (Milestone 49) — real retention value, but
    deliberately reprioritized after public launch rather than gating
    it.
-10. **Lowest leverage right now, deliberately deferred**: storage
-    consolidation, paying down `dedupeByKey` debt, and extending test
-    coverage to the other five knowledge platforms — all real and
-    important, but **not executed until after Phase 5 ships in full**,
-    exactly as `ATLAS_AI_V2_FINAL.md` settled (Section 20).
+10. **Lowest leverage, deliberately deferred until after Phase 5 shipped
+    in full** (`ATLAS_AI_V2_FINAL.md` Section 20): storage consolidation
+    (done — Milestone 50), paying down `dedupeByKey` debt, and extending
+    test coverage to the other five knowledge platforms — the latter two
+    remain real, important, and still unscoped.
 
 ---
 
@@ -801,12 +828,13 @@ Direct answers to the specific operational questions:
   the most important debt actually worth paying (activating evidence,
   building verification).
 
-**Deliberately waits until after Version 2 ships in full**:
-- Storage consolidation (Memory + Supabase only, retiring raw Postgres
-  and the speculative Warehouse variant).
-- Paying down the `dedupeByKey`/`urlNormalization` debt (five copies).
+**Deliberately waited until after Version 2 shipped in full — now unblocked**:
+- ✅ Storage consolidation (Memory + Supabase only, retiring raw
+  Postgres and the speculative Warehouse variant) — **done, Milestone 50**.
+- Paying down the `dedupeByKey`/`urlNormalization` debt (five copies) —
+  still deferred, unscoped, real future work.
 - Extending the Milestone 30 test pattern to the other five knowledge
-  platforms.
+  platforms — still deferred, unscoped, real future work.
 
 **Architecture investments**: nothing new required — the existing six
 platforms suffice (settled in `ATLAS_AI_V2_FINAL.md`, Section 20, not
