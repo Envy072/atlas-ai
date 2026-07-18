@@ -5,11 +5,17 @@
 // built directly from stageHistory with no cross-list deduplication
 // required. Two small id generators are all this module needs.
 
-let sessionIdCounter = 0;
+import { randomUUID } from "node:crypto";
 
+// Cryptographically random, not sequential (Milestone 47 — the
+// Milestone 46 review's own finding: the prior `session_${Date.now()}_
+// ${counter}` shape was guessable/enumerable, and this id is the sole
+// access boundary for an anonymous caller's own session). The
+// `session_` prefix is kept purely for log readability — every bit of
+// this id's actual entropy comes from randomUUID(), so the prefix adds
+// no predictability.
 export function nextSessionId(): string {
-  sessionIdCounter += 1;
-  return `session_${Date.now()}_${sessionIdCounter}`;
+  return `session_${randomUUID()}`;
 }
 
 let timelineEntryIdCounter = 0;

@@ -20,16 +20,18 @@ export interface MockSupabaseClientOptions {
   insertResult?: { error: MockSupabaseError | null };
   /** What the terminal `.gte()` call resolves to (countProjectsThisMonth's count-mode select). */
   countResult?: { count: number | null; error: MockSupabaseError | null };
+  /** What `.rpc()` resolves to (Milestone 47 — lib/services/rateLimit's own Postgres functions). */
+  rpcResult?: MockSupabaseResult<unknown>;
 }
 
 // A small, hand-rolled mock implementing only the exact Supabase
-// client call chains lib/services/projects.ts and lib/services/auth.ts
-// actually use — precisely, not approximately
-// (MILESTONE_30_DESIGN.md Deliverable 5):
+// client call chains this codebase actually uses — precisely, not
+// approximately (MILESTONE_30_DESIGN.md Deliverable 5):
 //   auth.getUser()
 //   from().select().eq().order()                    (listProjects, one filter)
 //   from().select().eq().eq().maybeSingle()          (getProjectById, two chained filters)
 //   from().insert()                                  (persistProjectFromSession)
+//   rpc()                                             (lib/services/rateLimit's own increment/cleanup functions, Milestone 47)
 //
 // Every method is a vi.fn() spy, so a test can assert exactly which
 // arguments a service called it with (e.g. that `.eq` was called with
@@ -47,6 +49,7 @@ export function createMockSupabaseClient(options: MockSupabaseClientOptions = {}
   const selectResult = options.selectResult ?? { data: null, error: null };
   const insertResult = options.insertResult ?? { error: null };
   const countResult = options.countResult ?? { count: 0, error: null };
+  const rpcResult = options.rpcResult ?? { data: null, error: null };
 
   const eq = vi.fn(() => queryBuilder);
   const order = vi.fn(() => Promise.resolve(selectResult));
@@ -61,10 +64,12 @@ export function createMockSupabaseClient(options: MockSupabaseClientOptions = {}
   const from = vi.fn(() => ({ select, insert }));
 
   const getUser = vi.fn(() => Promise.resolve({ data: { user: options.user ?? null } }));
+  const rpc = vi.fn(() => Promise.resolve(rpcResult));
 
   const client = {
     auth: { getUser },
     from,
+    rpc,
   };
 
   return client as unknown as SupabaseClient;

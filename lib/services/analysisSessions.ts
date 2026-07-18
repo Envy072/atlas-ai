@@ -42,7 +42,11 @@ export type { CreateSessionInput };
 // into an otherwise framework-agnostic file for no reason; the route
 // layer already has it). None of the four analysis-session routes
 // require a user (they stay public, per the approved anonymous-analysis
-// decision) — userId is read and forwarded, never enforced, here.
+// decision). As of Milestone 47, userId is also forwarded into
+// lib/analysis-session's own lifecycle functions, which record it as a
+// session's ownerId and enforce it — a signed-in caller can only load,
+// cancel, or retry their own session; an anonymous session (ownerId:
+// null) remains open to anyone, unchanged.
 async function toView(session: AnalysisSession, userId: string | null): Promise<AnalysisSessionView> {
   const view: AnalysisSessionView = {
     session,
@@ -58,7 +62,7 @@ export async function startAnalysisSession(
   input: CreateSessionInput,
   userId: string | null
 ): Promise<AnalysisSessionView> {
-  const session = await createSession(input);
+  const session = await createSession(input, userId);
   return toView(session, userId);
 }
 
@@ -66,7 +70,7 @@ export async function getAnalysisSession(
   id: string,
   userId: string | null
 ): Promise<AnalysisSessionView | null> {
-  const session = await getSession(id);
+  const session = await getSession(id, userId);
   if (!session) return null;
   return toView(session, userId);
 }
@@ -78,7 +82,7 @@ export async function cancelAnalysisSession(
   if (!id.trim()) {
     throw new InvalidRequestError("A session id is required.");
   }
-  const session = await cancelSession(id);
+  const session = await cancelSession(id, userId);
   return toView(session, userId);
 }
 
@@ -89,6 +93,6 @@ export async function retryAnalysisSession(
   if (!id.trim()) {
     throw new InvalidRequestError("A session id is required.");
   }
-  const session = await retrySession(id);
+  const session = await retrySession(id, userId);
   return toView(session, userId);
 }

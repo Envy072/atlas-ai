@@ -1,9 +1,11 @@
 import { startAnalysisSession, CreateSessionInputSchema } from "@/lib/services/analysisSessions";
 import { getCurrentUser } from "@/lib/services/auth";
 import { countProjectsThisMonth } from "@/lib/services/projects";
-import { getUserTier, FREE_TIER_MONTHLY_ANALYSIS_LIMIT } from "@/lib/services/stripe";
+import { FREE_TIER_MONTHLY_ANALYSIS_LIMIT } from "@/lib/services/stripe";
+import { checkRateLimit } from "@/lib/services/rateLimit";
+import { resolveCallerContext } from "@/lib/api/clientIdentity";
 import { jsonSuccess, jsonError } from "@/lib/api/response";
-import { InvalidRequestError, UsageLimitExceededError } from "@/lib/errors";
+import { InvalidRequestError, UsageLimitExceededError, RateLimitExceededError } from "@/lib/errors";
 
 // The real 6-stage pipeline runs synchronously inside this one request
 // (Milestone 45 investigation) and can legitimately take 20-40+
@@ -37,6 +39,12 @@ export const maxDuration = 60;
 // at FREE_TIER_MONTHLY_ANALYSIS_LIMIT analyses per calendar month — an
 // anonymous caller has no user id to meter against and is unaffected,
 // exactly as before.
+//
+// As of Milestone 47, also rate-limited under the "analysis:create"
+// bucket (lib/services/rateLimit/config.ts) — this route triggers a
+// real, money-spending pipeline run per call, the actual abuse vector
+// the Milestone 46 review named. Checked before the monthly usage-limit
+// query, cheapest-check-first.
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -47,14 +55,17 @@ export async function POST(req: Request) {
     }
 
     const user = await getCurrentUser();
+    const { tier, identity } = await resolveCallerContext(req, user);
 
-    if (user) {
-      const tier = await getUserTier(user.id);
-      if (tier === "free") {
-        const usedThisMonth = await countProjectsThisMonth(user.id, new Date());
-        if (usedThisMonth >= FREE_TIER_MONTHLY_ANALYSIS_LIMIT) {
-          throw new UsageLimitExceededError();
-        }
+    const rateLimit = await checkRateLimit("analysis:create", identity, tier);
+    if (!rateLimit.allowed) {
+      throw new RateLimitExceededError();
+    }
+
+    if (user && tier === "free") {
+      const usedThisMonth = await countProjectsThisMonth(user.id, new Date());
+      if (usedThisMonth >= FREE_TIER_MONTHLY_ANALYSIS_LIMIT) {
+        throw new UsageLimitExceededError();
       }
     }
 

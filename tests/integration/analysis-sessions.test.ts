@@ -33,9 +33,20 @@ vi.mock("@/lib/services/projects", async (importOriginal) => {
   return { ...actual, countProjectsThisMonth: vi.fn() };
 });
 
+// Rate limiting (Milestone 47) is its own, separately-tested concern
+// (lib/services/rateLimit/checkRateLimit.test.ts) — mocked here to
+// always allow, so this file stays focused on proving the route
+// composes session creation/lookup correctly, not re-verifying the
+// limiter's own internals a second time.
+vi.mock("@/lib/services/rateLimit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/rateLimit")>();
+  return { ...actual, checkRateLimit: vi.fn() };
+});
+
 import { createClient } from "@/lib/supabase/server";
 import { getUserTier } from "@/lib/services/stripe";
 import { countProjectsThisMonth } from "@/lib/services/projects";
+import { checkRateLimit } from "@/lib/services/rateLimit";
 import { POST } from "@/app/api/analysis-sessions/route";
 import { GET } from "@/app/api/analysis-sessions/[id]/route";
 import type { User } from "@supabase/supabase-js";
@@ -43,6 +54,7 @@ import type { User } from "@supabase/supabase-js";
 const mockedCreateClient = vi.mocked(createClient);
 const mockedGetUserTier = vi.mocked(getUserTier);
 const mockedCountProjectsThisMonth = vi.mocked(countProjectsThisMonth);
+const mockedCheckRateLimit = vi.mocked(checkRateLimit);
 
 const FAKE_USER: User = {
   id: "user-1",
@@ -56,6 +68,8 @@ beforeEach(() => {
   mockedCreateClient.mockResolvedValue(createMockSupabaseClient({ user: null }));
   mockedGetUserTier.mockReset();
   mockedCountProjectsThisMonth.mockReset();
+  mockedCheckRateLimit.mockReset();
+  mockedCheckRateLimit.mockResolvedValue({ allowed: true, limit: 100, remaining: 99 });
 });
 
 function buildCreateRequest(body: unknown): Request {

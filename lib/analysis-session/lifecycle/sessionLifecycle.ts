@@ -20,11 +20,29 @@ import { defaultAnalysisSessionStore } from "@/lib/analysis-session/storage/defa
 // createStore() independently.
 const defaultStore: AnalysisSessionStore = defaultAnalysisSessionStore;
 
-async function loadRecordOrThrow(sessionId: string, store: AnalysisSessionStore): Promise<SessionRecord> {
+// Loads a record for a specific requester, treating "exists but belongs
+// to someone else" identically to "doesn't exist" (Milestone 47, per
+// the Milestone 46 review): a distinguishable 403 here would confirm a
+// guessed id is real, which is exactly the enumeration risk this
+// milestone closes. An anonymous session (ownerId: null) stays exactly
+// as accessible as it always has been — Milestone 27's approved
+// anonymous-analysis decision is unaffected.
+function assertAccessible(record: SessionRecord, requestingUserId: string | null): void {
+  if (record.ownerId !== null && record.ownerId !== requestingUserId) {
+    throw new InvalidRequestError(`No analysis session found for id "${record.id}".`);
+  }
+}
+
+async function loadRecordOrThrow(
+  sessionId: string,
+  requestingUserId: string | null,
+  store: AnalysisSessionStore
+): Promise<SessionRecord> {
   const record = await store.getById(sessionId);
   if (!record) {
     throw new InvalidRequestError(`No analysis session found for id "${sessionId}".`);
   }
+  assertAccessible(record, requestingUserId);
   return record;
 }
 
@@ -34,6 +52,7 @@ async function loadRecordOrThrow(sessionId: string, store: AnalysisSessionStore)
 // tiny SessionRecord that references it.
 export async function createSession(
   input: CreateSessionInput,
+  ownerId: string | null,
   store: AnalysisSessionStore = defaultStore
 ): Promise<AnalysisSession> {
   const validated = parseOrThrow(CreateSessionInputSchema, input, "Invalid session input.");
@@ -43,6 +62,7 @@ export async function createSession(
     executionId: execution.id,
     title: validated.title ?? validated.startupIdea,
     startupIdea: validated.startupIdea,
+    ownerId,
   });
   await store.upsert(record);
 
@@ -51,13 +71,18 @@ export async function createSession(
 
 // An orphaned session (its execution no longer exists) is not a valid
 // session (MILESTONE_12_DESIGN.md Section 17) — returns null rather than
-// a partially-composed view.
+// a partially-composed view. A session that exists but belongs to a
+// different user returns null for the identical reason (see
+// assertAccessible above) — the route layer already treats a null
+// result as "not found" with no change needed there.
 export async function getSession(
   sessionId: string,
+  requestingUserId: string | null,
   store: AnalysisSessionStore = defaultStore
 ): Promise<AnalysisSession | null> {
   const record = await store.getById(sessionId);
   if (!record) return null;
+  if (record.ownerId !== null && record.ownerId !== requestingUserId) return null;
 
   const execution = await getExecution(record.executionId);
   if (!execution) return null;
@@ -85,36 +110,40 @@ export async function listSessions(store: AnalysisSessionStore = defaultStore): 
 // any orchestration logic").
 export async function cancelSession(
   sessionId: string,
+  requestingUserId: string | null,
   store: AnalysisSessionStore = defaultStore
 ): Promise<AnalysisSession> {
-  const record = await loadRecordOrThrow(sessionId, store);
+  const record = await loadRecordOrThrow(sessionId, requestingUserId, store);
   const execution = await cancelPipeline(record.executionId);
   return composeAnalysisSession(record, execution);
 }
 
 export async function retrySession(
   sessionId: string,
+  requestingUserId: string | null,
   store: AnalysisSessionStore = defaultStore
 ): Promise<AnalysisSession> {
-  const record = await loadRecordOrThrow(sessionId, store);
+  const record = await loadRecordOrThrow(sessionId, requestingUserId, store);
   const execution = await retryStage(record.executionId);
   return composeAnalysisSession(record, execution);
 }
 
 export async function resumeSession(
   sessionId: string,
+  requestingUserId: string | null,
   store: AnalysisSessionStore = defaultStore
 ): Promise<AnalysisSession> {
-  const record = await loadRecordOrThrow(sessionId, store);
+  const record = await loadRecordOrThrow(sessionId, requestingUserId, store);
   const execution = await resumePipeline(record.executionId);
   return composeAnalysisSession(record, execution);
 }
 
 export async function getLogs(
   sessionId: string,
+  requestingUserId: string | null,
   store: AnalysisSessionStore = defaultStore
 ): Promise<LogEntry[]> {
-  const record = await loadRecordOrThrow(sessionId, store);
+  const record = await loadRecordOrThrow(sessionId, requestingUserId, store);
   const execution = await getExecution(record.executionId);
   if (!execution) {
     throw new InvalidRequestError(`No pipeline execution found for session "${sessionId}".`);

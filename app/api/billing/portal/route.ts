@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/services/auth";
 import { createBillingPortalUrl } from "@/lib/services/stripe";
-import { UnauthorizedError } from "@/lib/errors";
+import { checkRateLimit } from "@/lib/services/rateLimit";
+import { resolveCallerContext } from "@/lib/api/clientIdentity";
+import { UnauthorizedError, RateLimitExceededError } from "@/lib/errors";
 import { jsonError } from "@/lib/api/response";
 
 // GET, not POST — this route's only job is "redirect a signed-in user
@@ -24,6 +26,12 @@ export async function GET(req: Request) {
 
   let portalUrl: string;
   try {
+    const { tier, identity } = await resolveCallerContext(req, user);
+    const rateLimit = await checkRateLimit("billing:portal", identity, tier);
+    if (!rateLimit.allowed) {
+      throw new RateLimitExceededError();
+    }
+
     portalUrl = await createBillingPortalUrl(user.id, `${origin}/settings/billing`);
   } catch (error) {
     return jsonError(error);

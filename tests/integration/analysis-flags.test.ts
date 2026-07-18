@@ -14,10 +14,21 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
+// Rate limiting (Milestone 47) is its own, separately-tested concern
+// (lib/services/rateLimit/checkRateLimit.test.ts) — mocked here to
+// always allow, matching tests/integration/analysis-sessions.test.ts's
+// own established pattern.
+vi.mock("@/lib/services/rateLimit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/rateLimit")>();
+  return { ...actual, checkRateLimit: vi.fn() };
+});
+
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/services/rateLimit";
 import { POST } from "@/app/api/analysis-flags/route";
 
 const mockedCreateClient = vi.mocked(createClient);
+const mockedCheckRateLimit = vi.mocked(checkRateLimit);
 
 const FAKE_USER: User = {
   id: "user-1",
@@ -54,6 +65,8 @@ function toProjectRow(project: ReturnType<typeof buildProjectFixture>) {
 describe("POST /api/analysis-flags", () => {
   beforeEach(() => {
     mockedCreateClient.mockReset();
+    mockedCheckRateLimit.mockReset();
+    mockedCheckRateLimit.mockResolvedValue({ allowed: true, limit: 10, remaining: 9 });
   });
 
   it("golden path: an authenticated owner's well-formed report is accepted", async () => {

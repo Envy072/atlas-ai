@@ -1,8 +1,10 @@
 import { submitAnalysisFlag } from "@/lib/services/analysisFlags";
 import { CreateAnalysisFlagInputSchema } from "@/lib/schemas/analysisFlag";
 import { getCurrentUser } from "@/lib/services/auth";
+import { checkRateLimit } from "@/lib/services/rateLimit";
+import { resolveCallerContext } from "@/lib/api/clientIdentity";
 import { jsonSuccess, jsonError } from "@/lib/api/response";
-import { InvalidRequestError, UnauthorizedError } from "@/lib/errors";
+import { InvalidRequestError, UnauthorizedError, RateLimitExceededError } from "@/lib/errors";
 
 // Thin controller (MILESTONE_39_DESIGN.md Section 8/5): validate the
 // request, require an authenticated caller, call the one new service,
@@ -29,6 +31,12 @@ export async function POST(req: Request) {
 
     if (!user) {
       throw new UnauthorizedError();
+    }
+
+    const { tier, identity } = await resolveCallerContext(req, user);
+    const rateLimit = await checkRateLimit("analysis:flag", identity, tier);
+    if (!rateLimit.allowed) {
+      throw new RateLimitExceededError();
     }
 
     const flag = await submitAnalysisFlag(parsed.data, user.id);

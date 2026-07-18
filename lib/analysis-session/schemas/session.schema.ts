@@ -22,6 +22,11 @@ export const SessionRecordSchema = z.object({
   executionId: z.string(),
   title: z.string().min(1),
   startupIdea: z.string().min(1),
+  // The signed-in user who started this session, or null for an
+  // anonymous one (Milestone 47). Internal to this record only — never
+  // added to AnalysisSessionSchema below, since ownership is an
+  // enforcement detail the client-facing view has no reason to see.
+  ownerId: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

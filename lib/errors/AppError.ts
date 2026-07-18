@@ -87,6 +87,20 @@ export class UsageLimitExceededError extends AppError {
   }
 }
 
+// A caller exceeded a configured rate limit (Milestone 47 —
+// lib/services/rateLimit/). Deliberately its own class rather than
+// reusing InvalidRequestError: "you sent something malformed" and "you
+// sent too many well-formed requests" are different failure classes,
+// and describeError() (lib/errors/messages.ts) already has a specific
+// 429 fallback message ready for this status.
+export class RateLimitExceededError extends AppError {
+  constructor(message = "You're sending requests too quickly. Please wait and try again.") {
+    super(message, { status: 429, code: "rate_limit_exceeded" });
+    this.name = "RateLimitExceededError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;

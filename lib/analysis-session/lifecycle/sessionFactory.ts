@@ -5,6 +5,7 @@ export interface BuildSessionRecordInput {
   executionId: string;
   title: string;
   startupIdea: string;
+  ownerId: string | null;
 }
 
 // The one place a brand-new SessionRecord gets constructed — the tiny
@@ -19,6 +20,7 @@ export function buildSessionRecord(
     executionId: input.executionId,
     title: input.title,
     startupIdea: input.startupIdea,
+    ownerId: input.ownerId,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
   };
