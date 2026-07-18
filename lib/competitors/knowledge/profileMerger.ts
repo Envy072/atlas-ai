@@ -2,21 +2,15 @@ import type { Source, Evidence } from "@/lib/research";
 import type { CompanyProfile } from "@/lib/competitors/schemas/company.schema";
 import { CompanyProfileSchema } from "@/lib/competitors/schemas/company.schema";
 import { buildRefreshMetadata } from "@/lib/competitors/refresh/refreshPolicy";
-import { urlDedupeKey } from "@/lib/competitors/utils/urlNormalization";
+import { dedupeByKey, urlDedupeKey } from "@/lib/shared";
 import { parseOrThrow } from "@/lib/validation/parse";
 
+// Milestone 51 — previously a hand-rolled seen-set loop reimplementing
+// what lib/decision's own dedupeByUrl() already expressed as a
+// dedupeByKey() call; now delegates to the same shared primitives every
+// other platform's equivalent wrapper uses. Behavior unchanged.
 function dedupeByUrl<TItem extends { url: string }>(items: TItem[]): TItem[] {
-  const seen = new Set<string>();
-  const deduped: TItem[] = [];
-
-  for (const item of items) {
-    const key = urlDedupeKey(item.url);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(item);
-  }
-
-  return deduped;
+  return dedupeByKey(items, (item) => urlDedupeKey(item.url));
 }
 
 function mergeStringLists(existing: string[], incoming: string[]): string[] {

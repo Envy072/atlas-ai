@@ -6,8 +6,7 @@ import type { RiskFinding } from "@/lib/decision/schemas/riskFinding.schema";
 import { computeDecisionConfidence } from "@/lib/decision/confidence/decisionConfidence";
 import type { CoverageChecklist } from "@/lib/decision/types/confidence";
 import { buildDecisionRefreshMetadata } from "@/lib/decision/refresh/decisionRefreshPolicy";
-import { dedupeByKey } from "@/lib/decision/utils/dedupeByKey";
-import { urlDedupeKey } from "@/lib/decision/utils/urlNormalization";
+import { dedupeByKey, urlDedupeKey } from "@/lib/shared";
 import { parseOrThrow } from "@/lib/validation/parse";
 
 function dedupeByUrl<TItem extends { url: string }>(items: TItem[]): TItem[] {

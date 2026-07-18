@@ -1,6 +1,5 @@
 import type { Source, Evidence } from "@/lib/research";
-import { dedupeByKey } from "@/lib/decision/utils/dedupeByKey";
-import { urlDedupeKey } from "@/lib/decision/utils/urlNormalization";
+import { dedupeByKey, urlDedupeKey } from "@/lib/shared";
 
 export interface AggregatedEvidence {
   sources: Source[];

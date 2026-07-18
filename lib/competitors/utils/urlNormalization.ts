@@ -11,12 +11,3 @@ export function extractCompanyDomain(rawUrl: string): string {
     return rawUrl.trim().toLowerCase();
   }
 }
-
-// Case/trailing-slash-insensitive key for deduplicating a list of items
-// that each carry a `url` field — used by knowledge/profileMerger.ts to
-// keep a merged profile's sources list free of exact re-fetches of the
-// same page across successive refreshes.
-export function urlDedupeKey(rawUrl: string): string {
-  const trimmed = rawUrl.trim().toLowerCase();
-  return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
-}

@@ -1,5 +1,5 @@
 import type { Recommendation } from "@/lib/business";
-import { dedupeByKey } from "@/lib/decision/utils/dedupeByKey";
+import { dedupeByKey } from "@/lib/shared";
 
 const PRIORITY_ORDER: Record<Recommendation["priority"], number> = {
   urgent: 0,

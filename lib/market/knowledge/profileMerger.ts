@@ -7,8 +7,7 @@ import type { MarketTrend } from "@/lib/market/schemas/trends.schema";
 import type { Regulation } from "@/lib/market/schemas/regulation.schema";
 import type { MarketRisk } from "@/lib/market/schemas/risks.schema";
 import { buildMarketRefreshMetadata } from "@/lib/market/refresh/marketRefreshPolicy";
-import { dedupeByKey } from "@/lib/market/utils/dedupeByKey";
-import { urlDedupeKey } from "@/lib/market/utils/urlNormalization";
+import { dedupeByKey, urlDedupeKey } from "@/lib/shared";
 import { normalizeIndustryName } from "@/lib/market/utils/textNormalization";
 import { parseOrThrow } from "@/lib/validation/parse";
 

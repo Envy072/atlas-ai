@@ -268,6 +268,18 @@ fetching or other side effects.
 (`openai.ts`, `analysis.ts`, `projects.ts`, future `stripe.ts`/`auth.ts`).
 See Section 8. Never: React, Next.js request/response objects.
 
+**`lib/shared/`** (Milestone 51) — small, pure, framework-independent
+utilities genuinely reused across multiple knowledge platforms
+(`dedupeByKey<T>()`, `urlDedupeKey()`) — the consolidated home for what
+were previously several byte-identical, independently-written copies
+(`ARCHITECTURE_REVIEW.md`'s own Technical Debt #1, now partially paid
+down). A function belongs here only once it's genuinely duplicated
+verbatim across platforms, confirmed byte-identical before moving, never
+speculatively placed here "in case" it's reused later. Never: anything
+platform-specific, anything with side effects, anything requiring
+`React`/`next/*`/an external SDK — that's `lib/services/` or a specific
+platform's own `utils/` instead.
+
 **`lib/store/`** — Zustand store definitions (`analysisStore.ts`). Never:
 more than one store per genuinely distinct domain of shared state.
 

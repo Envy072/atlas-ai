@@ -5,8 +5,7 @@ import { BusinessProfileSchema } from "@/lib/business/schemas/business.schema";
 import type { Dependency } from "@/lib/business/schemas/execution.schema";
 import type { OperationalRisk } from "@/lib/business/schemas/risk.schema";
 import { buildBusinessRefreshMetadata } from "@/lib/business/refresh/businessRefreshPolicy";
-import { dedupeByKey } from "@/lib/business/utils/dedupeByKey";
-import { urlDedupeKey } from "@/lib/business/utils/urlNormalization";
+import { dedupeByKey, urlDedupeKey } from "@/lib/shared";
 import { normalizeLabel } from "@/lib/business/utils/textNormalization";
 import { parseOrThrow } from "@/lib/validation/parse";
 

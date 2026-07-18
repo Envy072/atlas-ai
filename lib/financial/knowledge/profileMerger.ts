@@ -5,8 +5,7 @@ import type { RevenueStream } from "@/lib/financial/schemas/revenue.schema";
 import type { Expense } from "@/lib/financial/schemas/costs.schema";
 import type { FinancialRisk } from "@/lib/financial/schemas/risk.schema";
 import { buildFinancialRefreshMetadata } from "@/lib/financial/refresh/financialRefreshPolicy";
-import { dedupeByKey } from "@/lib/financial/utils/dedupeByKey";
-import { urlDedupeKey } from "@/lib/financial/utils/urlNormalization";
+import { dedupeByKey, urlDedupeKey } from "@/lib/shared";
 import { normalizeLabel } from "@/lib/financial/utils/textNormalization";
 import { parseOrThrow } from "@/lib/validation/parse";
 

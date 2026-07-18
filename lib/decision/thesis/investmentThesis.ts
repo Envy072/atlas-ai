@@ -6,7 +6,7 @@ import { verifyClaim, tallyClaimVerificationResults } from "@/lib/decision/trace
 import type { ClaimVerificationResult } from "@/lib/decision/traceability/claimVerifier";
 import { generateCandidateThesisArguments } from "@/lib/services/openai";
 import type { CandidateThesisArgument } from "@/lib/decision/schemas/candidateThesisArgument.schema";
-import { dedupeByKey } from "@/lib/decision/utils/dedupeByKey";
+import { dedupeByKey } from "@/lib/shared";
 
 export interface BuildInvestmentThesisInput {
   positiveArguments?: string[];

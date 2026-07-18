@@ -2,7 +2,7 @@ import type { Evidence } from "@/lib/research";
 import type { Finding } from "@/lib/decision/schemas/finding.schema";
 import type { RiskFinding } from "@/lib/decision/schemas/riskFinding.schema";
 import type { InvestmentThesis } from "@/lib/decision/schemas/thesis.schema";
-import { dedupeByKey } from "@/lib/decision/utils/dedupeByKey";
+import { dedupeByKey } from "@/lib/shared";
 
 // Restricted, already-verified citable-evidence pool — the union of
 // evidence already cited by keyFindings, criticalRisks, and
