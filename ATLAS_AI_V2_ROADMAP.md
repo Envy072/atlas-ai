@@ -537,7 +537,15 @@ smaller Milestone count.
 - **Outside scope**: any new staleness logic or a proactive AI trigger
   — that is an explicitly noted v3/v4 refinement, not here.
 
-**Milestone 42 — Idea Comparison (Post-Launch Priority)**
+**Milestone 49 — Idea Comparison (Post-Launch Priority)**
+- *(Revision note: numbered 42 in earlier revisions of this document,
+  placed here in Phase 4's own section since that remains its correct
+  thematic home — Section 5/6's phase structure, not strict numeric
+  order, is this document's primary organizing principle, the same
+  reason Milestone 41 already sits here ahead of Phase 5's 43–48.
+  Renumbered to 49 once Milestone 48 — its own stated dependency —
+  actually shipped, matching this real execution order rather than
+  leaving a lower number appear chronologically after a higher one.)*
 - Mission: a lightweight view comparing two or more analyses for the
   same founder.
 - **Priority change (per the Executive Roadmap Review)**: this
@@ -554,6 +562,7 @@ smaller Milestone count.
   projects — this Milestone is deliberately simple and direct; deeper
   analysis is explicitly deferred to the 2030 vision in the approved
   document.
+- Dependencies: Milestone 48 (public launch) — now complete.
 
 ### Phase 5
 
@@ -709,7 +718,7 @@ of effort, for the founder:**
    infrastructure.
 8. Full Stripe integration and automated metering (Milestone 44) —
    commercial leverage, built only once demand is confirmed.
-9. Idea comparison (Milestone 42) — real retention value, but
+9. Idea comparison (Milestone 49) — real retention value, but
    deliberately reprioritized after public launch rather than gating
    it.
 10. **Lowest leverage right now, deliberately deferred**: storage
@@ -858,9 +867,10 @@ Phase 4 (Milestone 41 — Re-validation engineering):
      window; its user-facing release still waits for Phase 3 to close
      (Milestone 40), unchanged from the original plan.
 
-Phase 4 (Milestone 42 — Idea Comparison):
+Phase 4 (Milestone 49 — Idea Comparison):
    → moved out of the Version 2 critical path entirely; scheduled
-     after Milestone 48 (public launch) as a post-launch enhancement.
+     after Milestone 48 (public launch, now complete) as a post-launch
+     enhancement.
 ```
 
 **The single unbreakable critical dependency in this entire document**:
@@ -1029,7 +1039,7 @@ specifically:
   deliberately deferred (Section 12).
 - No carefully-designed onboarding before Phase 5 — unnecessary for a
   small private cohort.
-- No idea-comparison feature before public launch (Milestone 42 is a
+- No idea-comparison feature before public launch (Milestone 49 is a
   post-launch enhancement, not a v2 critical-path item).
 
 ---

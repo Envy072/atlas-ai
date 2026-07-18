@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { FolderKanban, Sparkles } from "lucide-react";
 import type { Project } from "@/lib/schemas/project";
-import { formatRelativeTime, formatPercent } from "@/lib/format";
+import { formatRelativeTime, formatPercent, getBusinessSummaryHeadline } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import EmptyState from "@/components/shared/EmptyState";
@@ -56,7 +56,7 @@ export default function RecentProjectsPanel({ projects }: RecentProjectsPanelPro
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-card-foreground">{project.title}</p>
                   <p className="mt-1 truncate text-sm text-muted-foreground">
-                    {businessSummary.valueProposition ?? businessSummary.businessModel ?? "No summary available."}
+                    {getBusinessSummaryHeadline(businessSummary)}
                   </p>
                 </div>
 

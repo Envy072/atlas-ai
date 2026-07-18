@@ -6,6 +6,7 @@ import {
   formatPercent,
   formatCurrencyUsd,
   formatRelativeTime,
+  getBusinessSummaryHeadline,
 } from "@/lib/format";
 
 describe("formatScore", () => {
@@ -60,6 +61,25 @@ describe("getSafeRedirectPath", () => {
 describe("formatPercent", () => {
   it("appends a percent sign", () => {
     expect(formatPercent(50)).toBe("50%");
+  });
+});
+
+// The shared fallback chain extracted at Milestone 49 — previously
+// duplicated inline in app/projects/page.tsx, now also used by
+// ProjectComparisonView.
+describe("getBusinessSummaryHeadline", () => {
+  it("prefers valueProposition when present", () => {
+    expect(getBusinessSummaryHeadline({ valueProposition: "A clear value prop.", businessModel: "SaaS" })).toBe(
+      "A clear value prop."
+    );
+  });
+
+  it("falls back to businessModel when valueProposition is absent", () => {
+    expect(getBusinessSummaryHeadline({ businessModel: "Marketplace" })).toBe("Marketplace");
+  });
+
+  it("falls back to an honest 'no summary' message when both are absent", () => {
+    expect(getBusinessSummaryHeadline({})).toBe("No summary available.");
   });
 });
 

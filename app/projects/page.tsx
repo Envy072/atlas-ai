@@ -3,7 +3,7 @@ import Link from "next/link";
 import { FolderKanban, SearchX } from "lucide-react";
 import { listProjects } from "@/lib/services/projects";
 import { getCurrentUser } from "@/lib/services/auth";
-import { formatPercent } from "@/lib/format";
+import { formatPercent, getBusinessSummaryHeadline } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { H1, Small, Body } from "@/components/ui/typography";
@@ -46,15 +46,23 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
 
   return (
     <div className="mx-auto max-w-5xl p-8">
-      <div className="mb-8">
-        <H1>Projects</H1>
-        {q && (
-          <p className="mt-2 text-sm text-muted-foreground">
-            Showing results for &ldquo;{q}&rdquo; ·{" "}
-            <Link href="/projects" className="font-medium text-primary hover:underline">
-              Clear
-            </Link>
-          </p>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <H1>Projects</H1>
+          {q && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Showing results for &ldquo;{q}&rdquo; ·{" "}
+              <Link href="/projects" className="font-medium text-primary hover:underline">
+                Clear
+              </Link>
+            </p>
+          )}
+        </div>
+
+        {allProjects.length >= 2 && (
+          <Link href="/projects/compare" className="text-sm font-medium text-primary hover:underline">
+            Compare analyses
+          </Link>
         )}
       </div>
 
@@ -95,9 +103,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                     </Badge>
                   </div>
 
-                  <Body className="mb-6 text-muted-foreground">
-                    {businessSummary.valueProposition ?? businessSummary.businessModel ?? "No summary available."}
-                  </Body>
+                  <Body className="mb-6 text-muted-foreground">{getBusinessSummaryHeadline(businessSummary)}</Body>
 
                   <div className="grid gap-6 md:grid-cols-2">
                     <div>

@@ -47,6 +47,21 @@ export function formatPercent(value: number): string {
   return `${value}%`;
 }
 
+// A business summary may honestly have no valueProposition/businessModel
+// yet — never fabricated, always a real "not yet known" state. Reused
+// identically by the Projects list (app/projects/page.tsx) and the Idea
+// Comparison view (Milestone 49), so this exact fallback chain exists in
+// one place, not duplicated at each call site. Typed narrowly to just
+// the two fields actually read, rather than importing BusinessSummary
+// from lib/decision — this file stays a pure, dependency-free
+// formatting layer, never a consumer of a knowledge platform's schema.
+export function getBusinessSummaryHeadline(businessSummary: {
+  valueProposition?: string;
+  businessModel?: string;
+}): string {
+  return businessSummary.valueProposition ?? businessSummary.businessModel ?? "No summary available.";
+}
+
 const compactUsdFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
