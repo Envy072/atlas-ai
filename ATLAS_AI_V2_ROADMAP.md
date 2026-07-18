@@ -352,9 +352,11 @@ overall purpose, duration estimate, or exit criteria.
   underlying billing/analysis systems, with no functional change to
   either.
 - **Exit criteria**: a Release Readiness Review (Section 16,
-  Milestone 46) is passed before any public, self-serve announcement —
-  which now follows Step 3, once both automated metering and the
-  production-polish pass are complete.
+  Milestone 46) is passed, and the review's own findings (Milestone 47)
+  are closed, before any public, self-serve announcement
+  (Milestone 48) — which now follows Step 3, once automated metering,
+  the production-polish pass, and session/rate-limiting hardening are
+  all complete.
 
 ---
 
@@ -614,13 +616,70 @@ smaller Milestone count.
 - Dependencies: Milestone 44 (Full Stripe Integration & Automated
   Metering).
 
-**Milestone 46 — Release Readiness Review and Public Launch**
-- Mission: the final release gate (Section 16) before publicly
-  announcing self-serve access to the paid "Founder" tier, now that
-  automated metering (Milestone 44) and the production-polish pass
-  (Milestone 45) are both complete.
+**Milestone 46 — Release Readiness Review**
+- Mission: the release gate (Section 16) verifying automated metering
+  (Milestone 44) and the production-polish pass (Milestone 45) are both
+  genuinely ready. Produces a review document with an A/B/C verdict
+  (matching the Milestone 31 review's own model), not a go/no-go on
+  public launch itself — that is Milestone 48's own, later gate.
+  *(Revision note: this Milestone's name and mission were split from
+  "Release Readiness Review and Public Launch" once execution revealed
+  those were two different activities — a review producing a document,
+  and a separate, later engineering/business action. See Milestones 47
+  and 48 below.)*
 - **Outside scope**: any new engineering work — this Milestone is
   review and verification only.
+- Delivered: `MILESTONE_46_RELEASE_READINESS_REVIEW.md` — verdict B
+  (ready, with two small items worth resolving before public self-serve
+  exposure specifically), which became Milestone 47's scope.
+
+**Milestone 47 — Session Identifier Hardening & API Rate Limiting**
+- Mission: close the two items the Milestone 46 review named as worth
+  resolving specifically because a public launch changes their risk —
+  guessable/sequential analysis-session ids, and the absence of any
+  rate limiting across the API surface. Both were long-standing,
+  previously-accepted debt under a private-cohort threat model, not a
+  regression introduced by any single prior Milestone.
+- Scope: cryptographically random session ids (replacing the prior
+  sequential timestamp+counter scheme) with real per-session ownership
+  enforcement for signed-in callers (a mismatch is treated identically
+  to "session not found," never a distinguishable 403 — closing an
+  enumeration side-channel, not just the id format itself); a
+  tier-aware rate limiter across every non-webhook API route, backed by
+  a swappable store interface (Postgres today; Redis a documented,
+  drop-in future backend requiring no route-level change).
+- **Outside scope**: any change to the Stripe integration, webhook
+  handling, or authentication itself; any new subscription tier; the
+  actual public-launch action (Milestone 48).
+- Dependencies: Milestone 46 (the review that named this scope).
+- Delivered: commit `33c6dd9`.
+
+**Milestone 48 — Public Launch**
+- Mission: the actual remaining half of what this roadmap originally
+  bundled into "Milestone 46 — Release Readiness Review and Public
+  Launch" before this revision separated the two — a real, simple
+  onboarding flow (Section 11's own "a simple version appears with
+  public launch" commitment, never built before this point). The
+  "go-live" half of the original mission — publicly announcing
+  self-serve access — is a business/marketing decision, not an
+  engineering deliverable; nothing in this codebase can encode "we are
+  now telling people about this," so this Milestone's own engineering
+  scope is the onboarding flow only.
+- Scope (decided at design time): a single, minimal post-signup welcome
+  step — not a multi-step wizard or tutorial system — shown once,
+  immediately after a successful signup, before the dashboard: a
+  one-line description of what Atlas AI does, the new account's real
+  plan (Free, read via the existing getUserTier(), never hardcoded),
+  and one primary action (start a first analysis), with an unobtrusive
+  way to skip straight to the dashboard.
+- **Outside scope**: any multi-step onboarding wizard, product tour, or
+  tutorial system; any change to the signup form itself beyond its
+  post-success redirect target; any plan-selection step during signup
+  (Founder access remains a separate, later upgrade via /pricing,
+  unchanged); the actual public announcement/marketing action itself.
+- Dependencies: Milestone 47 (both review findings closed) — the
+  release gate (Milestone 46) does not permit a public announcement
+  before this.
 
 ---
 
@@ -705,7 +764,7 @@ Direct answers to the specific operational questions:
   lightest possible mechanism (Milestone 43 — Payment Links), not full
   metering.
 - **When does onboarding exist?** A simple version appears with
-  Milestone 46 (public launch) — not a priority before that.
+  Milestone 48 (public launch) — not a priority before that.
 - **When are beta users invited?** Milestone 39, small and deliberately
   private — not a public announcement. The same cohort is also used to
   gather a direct willingness-to-pay signal, ahead of any billing
@@ -790,7 +849,9 @@ Phase 1 (Evidence)
                → Phase 5 (Billing) — forbidden before clearing this gate
                   → Milestone 43 (Payment Links) → Milestone 44 (Full
                     Stripe) → Milestone 45 (Production Polish) →
-                    Milestone 46 (Public Launch)
+                    Milestone 46 (Release Readiness Review) →
+                    Milestone 47 (Session/Rate-Limit Hardening) →
+                    Milestone 48 (Public Launch)
 
 Phase 4 (Milestone 41 — Re-validation engineering):
    → depends only on Phase 1; runs in parallel with Phase 2's calendar
@@ -799,7 +860,7 @@ Phase 4 (Milestone 41 — Re-validation engineering):
 
 Phase 4 (Milestone 42 — Idea Comparison):
    → moved out of the Version 2 critical path entirely; scheduled
-     after Milestone 46 (public launch) as a post-launch enhancement.
+     after Milestone 48 (public launch) as a post-launch enhancement.
 ```
 
 **The single unbreakable critical dependency in this entire document**:

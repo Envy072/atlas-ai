@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
+import { ATLAS_AI_PRODUCT_DESCRIPTION } from "@/lib/copy";
 import { Button } from "@/components/ui/button";
 
 interface DashboardWelcomeProps {
@@ -27,10 +28,7 @@ export default function DashboardWelcome({ displayName }: DashboardWelcomeProps)
 
         <h1 className="text-3xl font-bold tracking-tight">Good to see you, {displayName}</h1>
 
-        <p className="mt-2 max-w-xl leading-7 text-white/80">
-          Describe your next startup idea and Atlas AI will stress-test it like an
-          investment committee — market, competition, risk, and a final verdict.
-        </p>
+        <p className="mt-2 max-w-xl leading-7 text-white/80">{ATLAS_AI_PRODUCT_DESCRIPTION}</p>
       </div>
 
       <Button

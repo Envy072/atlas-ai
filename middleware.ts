@@ -10,7 +10,9 @@ import { type NextRequest, NextResponse } from "next/server";
 // /competitors was in that same "left untouched" group until Milestone
 // 29 gave it real, user-owned data to protect (MILESTONE_29_DESIGN.md
 // Deliverable 10) — it no longer belongs in that group.
-const PROTECTED_PATHS = new Set(["/dashboard", "/projects", "/settings", "/competitors"]);
+// /welcome joined at Milestone 48 — it reads getUserTier(), which
+// needs a real signed-in user, same reasoning as every other entry here.
+const PROTECTED_PATHS = new Set(["/dashboard", "/projects", "/settings", "/competitors", "/welcome"]);
 
 // The symmetric case (MILESTONE_28_DESIGN.md Deliverable 8b): an
 // already-authenticated visitor gets no reason to see the sign-in/

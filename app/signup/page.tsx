@@ -58,8 +58,13 @@ function SignupForm() {
     // only when confirmation isn't required. Only navigate away in
     // that case; otherwise the "check your email" message is the only
     // thing to show, unchanged from before this milestone.
+    //
+    // Fallback destination is /welcome, not /dashboard (Milestone 48) —
+    // a brand-new signup's default landing spot; an explicit, valid
+    // redirectTo (e.g. bounced here from a specific protected page) is
+    // still honored exactly as before, unchanged.
     if (data.session) {
-      router.push(getSafeRedirectPath(searchParams.get("redirectTo"), "/dashboard"));
+      router.push(getSafeRedirectPath(searchParams.get("redirectTo"), "/welcome"));
       return;
     }
 
