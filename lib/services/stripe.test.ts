@@ -22,8 +22,10 @@ import {
   handleSubscriptionUpdated,
   handleSubscriptionDeleted,
   getUserTier,
+  getSubscriptionDetails,
+  createBillingPortalUrl,
 } from "@/lib/services/stripe";
-import { WebhookVerificationError } from "@/lib/errors";
+import { WebhookVerificationError, InvalidRequestError } from "@/lib/errors";
 
 const mockedStripeSdk = vi.mocked(StripeSdk);
 const mockedCreateAdminClient = vi.mocked(createAdminClient);
@@ -36,6 +38,24 @@ const mockedCreateClient = vi.mocked(createClient);
 function mockStripeConstructor(constructEvent: (...args: unknown[]) => Stripe.Event): void {
   mockedStripeSdk.mockImplementation(function mockConstructor() {
     return { webhooks: { constructEvent } } as unknown as StripeSdk;
+  } as unknown as typeof StripeSdk);
+}
+
+// A second constructor mock for the two Milestone 45 functions, which
+// call subscriptions.retrieve()/billingPortal.sessions.create() rather
+// than webhooks.constructEvent() — kept separate from
+// mockStripeConstructor() above rather than merging the two shapes
+// into one increasingly-branchy mock (the same judgment call
+// stripe.test.ts's own createMockAdminClient comment already applies).
+function mockStripeClient(overrides: {
+  retrieveSubscription?: (id: string) => Promise<unknown>;
+  createPortalSession?: (params: unknown) => Promise<{ url: string }>;
+}): void {
+  mockedStripeSdk.mockImplementation(function mockConstructor() {
+    return {
+      subscriptions: { retrieve: overrides.retrieveSubscription ?? vi.fn() },
+      billingPortal: { sessions: { create: overrides.createPortalSession ?? vi.fn() } },
+    } as unknown as StripeSdk;
   } as unknown as typeof StripeSdk);
 }
 
@@ -266,5 +286,95 @@ describe("getUserTier", () => {
     expect(consoleErrorSpy).toHaveBeenCalled();
 
     consoleErrorSpy.mockRestore();
+  });
+});
+
+describe("getSubscriptionDetails", () => {
+  it("returns null when no subscription row exists", async () => {
+    mockedCreateClient.mockResolvedValue(
+      createMockAdminClient({ selectResult: { data: null, error: null } }) as never
+    );
+
+    expect(await getSubscriptionDetails("user-1")).toBeNull();
+  });
+
+  it("fetches the renewal date live from the subscription's own item, not a stored column", async () => {
+    mockedCreateClient.mockResolvedValue(
+      createMockAdminClient({
+        selectResult: {
+          data: {
+            tier: "founder",
+            status: "active",
+            stripe_customer_id: "cus_1",
+            stripe_subscription_id: "sub_1",
+          },
+          error: null,
+        },
+      }) as never
+    );
+    const periodEndUnixSeconds = 1_800_000_000;
+    mockStripeClient({
+      retrieveSubscription: () =>
+        Promise.resolve({ items: { data: [{ current_period_end: periodEndUnixSeconds }] } }),
+    });
+
+    const result = await getSubscriptionDetails("user-1");
+
+    expect(result).toEqual({
+      tier: "founder",
+      status: "active",
+      stripeCustomerId: "cus_1",
+      stripeSubscriptionId: "sub_1",
+      currentPeriodEnd: new Date(periodEndUnixSeconds * 1000).toISOString(),
+    });
+  });
+
+  it("degrades currentPeriodEnd to null (not a thrown error) when the live Stripe lookup fails", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockedCreateClient.mockResolvedValue(
+      createMockAdminClient({
+        selectResult: {
+          data: { tier: "founder", status: "active", stripe_customer_id: "cus_1", stripe_subscription_id: "sub_1" },
+          error: null,
+        },
+      }) as never
+    );
+    mockStripeClient({ retrieveSubscription: () => Promise.reject(new Error("Stripe API hiccup.")) });
+
+    const result = await getSubscriptionDetails("user-1");
+
+    expect(result?.currentPeriodEnd).toBeNull();
+    expect(result?.tier).toBe("founder");
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
+});
+
+describe("createBillingPortalUrl", () => {
+  it("throws InvalidRequestError when the user has no billing account", async () => {
+    mockedCreateClient.mockResolvedValue(
+      createMockAdminClient({ selectResult: { data: null, error: null } }) as never
+    );
+
+    await expect(createBillingPortalUrl("user-1", "https://example.com/settings/billing")).rejects.toThrow(
+      InvalidRequestError
+    );
+  });
+
+  it("creates a real portal session for the user's real Stripe customer id and returns its URL", async () => {
+    mockedCreateClient.mockResolvedValue(
+      createMockAdminClient({ selectResult: { data: { stripe_customer_id: "cus_1" }, error: null } }) as never
+    );
+    const createPortalSession = vi.fn(() => Promise.resolve({ url: "https://billing.stripe.com/session/xyz" }));
+    mockStripeClient({ createPortalSession });
+
+    const url = await createBillingPortalUrl("user-1", "https://example.com/settings/billing");
+
+    expect(url).toBe("https://billing.stripe.com/session/xyz");
+    expect(createPortalSession).toHaveBeenCalledWith({
+      customer: "cus_1",
+      return_url: "https://example.com/settings/billing",
+    });
   });
 });

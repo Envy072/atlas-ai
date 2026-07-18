@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
-import { listProjects } from "@/lib/services/projects";
+import { listProjects, countProjectsThisMonth } from "@/lib/services/projects";
 import { getCurrentUser } from "@/lib/services/auth";
+import { getUserTier } from "@/lib/services/stripe";
 import { formatDisplayName } from "@/lib/format";
 import DashboardHome from "@/components/dashboard/home/DashboardHome";
 
@@ -9,13 +10,32 @@ import DashboardHome from "@/components/dashboard/home/DashboardHome";
 // it's how this page gets the real user id listProjects() now requires
 // (Milestone 27c: a project list is always scoped to one user, never
 // "everyone's"). Never assumed present just because middleware ran.
+//
+// As of Milestone 45, also fetches tier/this-month's-analysis-count for
+// DashboardAccountSummary — reusing the exact same
+// getUserTier()/countProjectsThisMonth() calls the Usage page and the
+// analysis-creation route already use, not a new data source.
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
   }
 
-  const projects = await listProjects(user.id);
+  // Three independent reads, keyed only on user.id — run in parallel
+  // rather than as a sequential waterfall, since none depends on
+  // another's result.
+  const [projects, tier, analysesThisMonth] = await Promise.all([
+    listProjects(user.id),
+    getUserTier(user.id),
+    countProjectsThisMonth(user.id, new Date()),
+  ]);
 
-  return <DashboardHome projects={projects} displayName={formatDisplayName(user.email ?? "")} />;
+  return (
+    <DashboardHome
+      projects={projects}
+      displayName={formatDisplayName(user.email ?? "")}
+      tier={tier}
+      analysesThisMonth={analysesThisMonth}
+    />
+  );
 }

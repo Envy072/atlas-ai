@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { WebhookVerificationError, ExternalServiceError } from "@/lib/errors";
+import { WebhookVerificationError, ExternalServiceError, InvalidRequestError } from "@/lib/errors";
 import type { SubscriptionTier, SubscriptionStatus } from "@/lib/schemas/subscription";
 
 // The upper bound of the pricing page's own "1-2 analyses per month"
@@ -213,4 +213,91 @@ export async function getUserTier(userId: string): Promise<SubscriptionTier> {
   }
 
   return data.tier;
+}
+
+export interface SubscriptionDetails {
+  tier: SubscriptionTier;
+  status: SubscriptionStatus;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  // Fetched live from Stripe on every call, never persisted
+  // (MILESTONE_45_DESIGN.md — Supabase's own schema stays exactly as
+  // Milestone 44 left it). Stripe remains the single source of truth
+  // for its own billing-period data; null if the live lookup fails, so
+  // a transient Stripe API hiccup degrades this one field rather than
+  // failing the whole Billing page.
+  currentPeriodEnd: string | null;
+}
+
+// The Billing page's one read (Milestone 45, Part 4) — reuses the same
+// cookie-aware client / "no row = free" shape as getUserTier(), plus a
+// live Stripe lookup for the one field this table doesn't store.
+export async function getSubscriptionDetails(userId: string): Promise<SubscriptionDetails | null> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("tier, status, stripe_customer_id, stripe_subscription_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Supabase Error:", error);
+    return null;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  let currentPeriodEnd: string | null = null;
+  try {
+    const subscription = await getStripeClient().subscriptions.retrieve(data.stripe_subscription_id);
+    // current_period_end lives on the subscription's own item(s), not
+    // the subscription object itself, in this SDK's API version —
+    // confirmed directly against the installed stripe package's own
+    // type definitions before writing this, not assumed from an older
+    // API shape.
+    const periodEnd = subscription.items.data[0]?.current_period_end;
+    if (periodEnd) {
+      currentPeriodEnd = new Date(periodEnd * 1000).toISOString();
+    }
+  } catch (error) {
+    console.error("Stripe Error: could not retrieve live subscription details", error);
+  }
+
+  return {
+    tier: data.tier,
+    status: data.status,
+    stripeCustomerId: data.stripe_customer_id,
+    stripeSubscriptionId: data.stripe_subscription_id,
+    currentPeriodEnd,
+  };
+}
+
+// Creates a real Stripe Customer Portal session and returns its
+// short-lived URL (Milestone 45, Part 4) — additive: a new capability
+// on top of the existing customer record, never touching the checkout/
+// webhook flow Milestone 44 already built. Throws InvalidRequestError
+// (not silently redirecting nowhere) if the caller has no billing
+// account at all — a Free-tier user has nothing to manage yet.
+export async function createBillingPortalUrl(userId: string, returnUrl: string): Promise<string> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("stripe_customer_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new InvalidRequestError("No billing account found for this user.");
+  }
+
+  const session = await getStripeClient().billingPortal.sessions.create({
+    customer: data.stripe_customer_id,
+    return_url: returnUrl,
+  });
+
+  return session.url;
 }

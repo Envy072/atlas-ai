@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles, AlertCircle } from "lucide-react";
 import { useAnalysisSession, isTerminalSessionState } from "@/hooks/useAnalysisSession";
+import { useToastManager } from "@/components/ui/toast";
 import type { Project } from "@/lib/schemas/project";
 import { Card } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import EmptyState from "@/components/shared/EmptyState";
 import IdeaCommandCenter from "@/components/workspace/command-center/IdeaCommandCenter";
 import SessionProgressExperience from "@/components/workspace/session/SessionProgressExperience";
@@ -29,6 +30,7 @@ export default function AIWorkspace({ projects }: AIWorkspaceProps) {
   const router = useRouter();
   const [idea, setIdea] = useState("");
   const { view, status, error, start, cancel, retry } = useAnalysisSession();
+  const toastManager = useToastManager();
 
   // ReportHistoryPanel's `projects` prop is fetched once, server-side, at
   // page-load time (app/dashboard/analysis/page.tsx) — analyzing an idea
@@ -44,6 +46,54 @@ export default function AIWorkspace({ projects }: AIWorkspaceProps) {
       router.refresh();
     }
   }, [view?.session.state, router]);
+
+  // A toast is a genuine, additional signal beyond the in-place
+  // progress→report swap already happening on this same page (Milestone
+  // 45, Part 7) — most useful when the tab isn't in focus. Fires exactly
+  // once per terminal state, not once per render: keyed on the session
+  // id + state pair so a page refresh or reopening the same completed
+  // session doesn't re-toast. sessionId/state are read into their own
+  // variables (rather than the effect reading `view` directly) so the
+  // dependency array below can list the two primitives that actually
+  // matter instead of the whole `view` object, which changes identity
+  // on every poll tick.
+  const sessionId = view?.session.id;
+  const sessionState = view?.session.state;
+
+  // useToastManager() subscribes this component to the toast store, so
+  // its return value gets a new identity every time any toast is
+  // added/updated — including by this very effect. Listing toastManager
+  // itself as a dependency therefore re-fires the effect every time it
+  // calls .add(), which re-renders, which re-fires the effect: a real
+  // infinite loop (caught live via "Maximum update depth exceeded"), not
+  // a harmless one. Routed through a ref (same stable-identity pattern
+  // as useAnalyzeStartup) so the effect below depends only on the two
+  // primitives that should actually retrigger it.
+  const toastManagerRef = useRef(toastManager);
+  useEffect(() => {
+    toastManagerRef.current = toastManager;
+  }, [toastManager]);
+
+  useEffect(() => {
+    if (!sessionId || (sessionState !== "completed" && sessionState !== "failed")) return;
+
+    const toastId = `session-${sessionId}-${sessionState}`;
+    if (sessionState === "completed") {
+      toastManagerRef.current.add({
+        id: toastId,
+        type: "success",
+        title: "Analysis complete",
+        description: "Your report is ready below.",
+      });
+    } else {
+      toastManagerRef.current.add({
+        id: toastId,
+        type: "error",
+        title: "Analysis failed",
+        description: "Something went wrong generating this analysis.",
+      });
+    }
+  }, [sessionId, sessionState]);
 
   async function analyzeIdea() {
     await start(idea);
@@ -61,7 +111,8 @@ export default function AIWorkspace({ projects }: AIWorkspaceProps) {
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertTitle>{error.title}</AlertTitle>
+            <AlertDescription>{error.description}</AlertDescription>
           </Alert>
         )}
 

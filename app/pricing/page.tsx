@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { Check, CheckCircle2 } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import { getCurrentUser } from "@/lib/services/auth";
+import { getUserTier } from "@/lib/services/stripe";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { H2, H3, Display, Body, Small, Caption } from "@/components/ui/typography";
@@ -64,6 +65,15 @@ function buildFounderCheckoutUrl(paymentLinkUrl: string, userId: string): string
 
 export default async function PricingPage() {
   const user = await getCurrentUser();
+  // Only ever "founder" for a real, active subscription (getUserTier()
+  // itself already collapses "no row"/canceled/past_due to "free") — a
+  // signed-out visitor is never checked at all, avoiding a pointless
+  // query for someone with no account to have a tier on. Named
+  // `userTier`, not `tier` — the tier CARD being rendered below (a
+  // PricingTier object) already owns that name in its own map callback,
+  // and shadowing it here would silently compare a whole object to a
+  // string.
+  const userTier = user ? await getUserTier(user.id) : "free";
 
   return (
     <main className="min-h-screen bg-white">
@@ -99,7 +109,15 @@ export default async function PricingPage() {
               </ul>
 
               <div className="mt-8">
-                {tier.name === "Free" ? (
+                {tier.name === "Founder" && userTier === "founder" ? (
+                  <div className="rounded-lg border border-success/30 bg-success/10 px-4 py-2.5 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+                      <Small className="text-success">Founder Plan Active</Small>
+                    </div>
+                    <Caption className="mt-1 text-success/80">Unlimited analyses</Caption>
+                  </div>
+                ) : tier.name === "Free" ? (
                   <Button className="w-full" variant="secondary" render={<Link href="/signup" />}>
                     Get started free
                   </Button>

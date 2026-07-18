@@ -19,7 +19,13 @@ describe("jsonError", () => {
   it("exposes an AppError's own message and status as-is", async () => {
     const response = jsonError(new InvalidRequestError("Bad input."));
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Bad input." });
+    // `code` is Milestone 45's own additive field — lets the client
+    // (lib/http/apiClient.ts's ApiClientError) distinguish which
+    // AppError subclass occurred without pattern-matching on message
+    // text. The two fallback tests below don't need updating: a
+    // non-AppError has no `code` at all, and JSON.stringify drops an
+    // `undefined` value entirely rather than serializing it.
+    expect(await response.json()).toEqual({ error: "Bad input.", code: "invalid_request" });
   });
 
   it("replaces an unexpected error's message with the fallback, and logs the real one", async () => {

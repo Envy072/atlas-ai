@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
+import { ToastProvider, ToastViewport, ToastList } from "@/components/ui/toast";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,6 +31,16 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
+        {/* A real crash, reproduced live during Milestone 45's own
+            end-to-end verification: a browser auto-translating this page
+            (Chrome's built-in Translate, common for any visitor whose
+            browser locale differs from "en") mutates the live DOM out
+            from under React's own reconciliation, throwing a genuine
+            "NotFoundError: Failed to execute 'insertBefore'" that trips
+            the route's error boundary mid-analysis. This tells Google
+            Translate not to offer translation on this page at all —
+            the standard, documented fix for this exact conflict. */}
+        <meta name="google" content="notranslate" />
         {/* Applies the saved theme before first paint, so there's no
             flash of the wrong theme. See CLAUDE.md Section 10 / 9 — the
             .dark class this toggles is the same one globals.css already
@@ -52,7 +63,18 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {/* Wraps the whole app once (Milestone 45) so any client
+            component can call useToastManager().add(...) without its
+            own provider — matching the "one shared mechanism" rule
+            already applied to Zustand for shared state. */}
+        <ToastProvider>
+          {children}
+          <ToastViewport>
+            <ToastList />
+          </ToastViewport>
+        </ToastProvider>
+      </body>
     </html>
   );
 }

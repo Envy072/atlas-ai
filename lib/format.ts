@@ -86,3 +86,13 @@ export function formatRelativeTime(isoDate: string): string {
 
   return relativeTimeFormatter.format(Math.round(elapsedSeconds / 31557600), "year");
 }
+
+const dateFormatter = new Intl.DateTimeFormat("en", { year: "numeric", month: "long", day: "numeric" });
+
+// Formats an ISO timestamp as "August 17, 2026" — an absolute date, for
+// contexts where "in 12 days" (formatRelativeTime's own job) is less
+// useful than the real calendar date, e.g. a subscription's renewal
+// date (Milestone 45's Billing page).
+export function formatDate(isoDate: string): string {
+  return dateFormatter.format(new Date(isoDate));
+}

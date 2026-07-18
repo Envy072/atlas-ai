@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronRight, Loader2, RotateCcw, XCircle, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -51,6 +52,30 @@ const STAGE_LABELS: Record<StageName, string> = {
   business: "Business",
   decision: "Decision",
 };
+
+// Matches the pipeline's own real, observed range (Milestone 45
+// investigation) — not a guess. Past this, the message switches from
+// the upfront estimate to an honest "still running" state rather than
+// leaving the same static text up indefinitely.
+const STILL_RUNNING_THRESHOLD_SECONDS = 40;
+
+// Ticks once a second while the session is active, purely to drive the
+// estimated-time copy below — never affects `progress`/`timeline`
+// themselves, which stay exactly what the server last reported.
+function useElapsedSeconds(startedAt: string, active: boolean): number {
+  const [elapsed, setElapsed] = useState(() => Math.floor((Date.now() - Date.parse(startedAt)) / 1000));
+
+  useEffect(() => {
+    if (!active) return;
+
+    const tick = () => setElapsed(Math.floor((Date.now() - Date.parse(startedAt)) / 1000));
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [startedAt, active]);
+
+  return elapsed;
+}
 
 type StepStatus = "done" | "current" | "attention" | "pending";
 
@@ -125,6 +150,12 @@ export default function SessionProgressExperience({
   const pill = state === "completed" ? undefined : STATE_PILL[state];
   const stepStatuses = computeStepStatuses(timeline);
 
+  const elapsedSeconds = useElapsedSeconds(session.createdAt, !terminal);
+  const stillRunning = !terminal && elapsedSeconds >= STILL_RUNNING_THRESHOLD_SECONDS;
+  const timeEstimate = stillRunning
+    ? "This analysis is still running. Large reports may take up to one minute."
+    : "Usually takes 20-40 seconds.";
+
   return (
     <Card className="p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -165,7 +196,13 @@ export default function SessionProgressExperience({
         })}
       </ol>
 
-      <p className="mb-4 text-sm font-medium text-foreground">{headline}</p>
+      <p className={cn("text-sm font-medium text-foreground", terminal ? "mb-4" : "mb-1.5")}>{headline}</p>
+
+      {!terminal && (
+        <p className={cn("mb-4 text-xs", stillRunning ? "text-warning" : "text-muted-foreground")}>
+          {timeEstimate}
+        </p>
+      )}
 
       <Progress value={progress.percent} className="mb-6" />
 

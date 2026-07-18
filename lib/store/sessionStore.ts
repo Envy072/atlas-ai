@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { AnalysisSessionView } from "@/lib/schemas/analysisSessionView";
+import type { UserFacingError } from "@/lib/errors/messages";
 
 export type SessionStatus = "idle" | "starting" | "polling" | "error";
 
@@ -7,12 +8,16 @@ interface SessionStore {
   sessionId: string | null;
   view: AnalysisSessionView | null;
   status: SessionStatus;
-  error: string | null;
+  // A structured { title, description } (Milestone 45's describeError())
+  // rather than a bare string — lets the UI show a real headline
+  // distinct from the explanation, instead of one undifferentiated
+  // sentence.
+  error: UserFacingError | null;
 
   setSessionId: (sessionId: string | null) => void;
   setView: (view: AnalysisSessionView) => void;
   setStatus: (status: SessionStatus) => void;
-  setError: (error: string | null) => void;
+  setError: (error: UserFacingError | null) => void;
   reset: () => void;
 }
 

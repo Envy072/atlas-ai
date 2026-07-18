@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { postJSON, getJSON } from "@/lib/http/apiClient";
 import { parseOrThrow } from "@/lib/validation/parse";
-import { getErrorMessage } from "@/lib/errors";
+import { describeError } from "@/lib/errors/messages";
+import type { UserFacingError } from "@/lib/errors/messages";
 import { AnalysisSessionViewSchema } from "@/lib/schemas/analysisSessionView";
 import type { AnalysisSessionView } from "@/lib/schemas/analysisSessionView";
 import { useSessionStore } from "@/lib/store/sessionStore";
@@ -28,7 +29,7 @@ export function isTerminalSessionState(state: SessionState): boolean {
 interface UseAnalysisSessionResult {
   view: AnalysisSessionView | null;
   status: "idle" | "starting" | "polling" | "error";
-  error: string | null;
+  error: UserFacingError | null;
   start: (startupIdea: string, title?: string) => Promise<void>;
   cancel: () => Promise<void>;
   retry: () => Promise<void>;
@@ -94,7 +95,7 @@ export function useAnalysisSession(): UseAnalysisSessionResult {
         }
       } catch (err) {
         setStatus("error");
-        setError(getErrorMessage(err));
+        setError(describeError(err));
       }
     },
     [parseView, setView, setStatus, setError]
@@ -125,7 +126,7 @@ export function useAnalysisSession(): UseAnalysisSessionResult {
         }
       } catch (err) {
         setStatus("error");
-        setError(getErrorMessage(err));
+        setError(describeError(err));
       }
     },
     [clearTimer, reset, parseView, poll, setSessionId, setView, setStatus, setError]
@@ -145,7 +146,7 @@ export function useAnalysisSession(): UseAnalysisSessionResult {
       }
     } catch (err) {
       setStatus("error");
-      setError(getErrorMessage(err));
+      setError(describeError(err));
     }
   }, [sessionId, clearTimer, parseView, poll, setView, setStatus, setError]);
 
@@ -164,7 +165,7 @@ export function useAnalysisSession(): UseAnalysisSessionResult {
       }
     } catch (err) {
       setStatus("error");
-      setError(getErrorMessage(err));
+      setError(describeError(err));
     }
   }, [sessionId, clearTimer, parseView, poll, setView, setStatus, setError]);
 

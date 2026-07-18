@@ -5,6 +5,18 @@ import { getUserTier, FREE_TIER_MONTHLY_ANALYSIS_LIMIT } from "@/lib/services/st
 import { jsonSuccess, jsonError } from "@/lib/api/response";
 import { InvalidRequestError, UsageLimitExceededError } from "@/lib/errors";
 
+// The real 6-stage pipeline runs synchronously inside this one request
+// (Milestone 45 investigation) and can legitimately take 20-40+
+// seconds — well past this platform's default serverless function
+// duration. Without this, a real, successful analysis can be cut off
+// mid-flight by the platform itself, which the client then
+// indistinguishably reports as a generic network error even though the
+// server keeps running and persists the result anyway. This is an
+// application-level route-segment config (version-controlled, in the
+// route file itself), not a change to any external/dashboard
+// configuration.
+export const maxDuration = 60;
+
 // Thin controller (MILESTONE_14_DESIGN.md Section 13/22): validate the
 // request, call the one new service, map the result to a response —
 // exactly the shape every existing route in this codebase already takes.
