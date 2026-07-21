@@ -137,6 +137,14 @@ async function executeStageWithRetry<TResult>(
         }
 
         current = transitionTo(current, "running", new Date());
+        // Persisted immediately, like every other transition in this
+        // function — otherwise the store's last real write stays
+        // "retry_pending" through the next attempt, and
+        // checkpointPreservingConcurrentState (which trusts the store as
+        // the source of truth for exactly this reason) would silently
+        // revert a subsequent successful attempt's state back to
+        // "retry_pending", corrupting it.
+        current = await writeCheckpoint(store, current);
         trigger = "auto_retry";
         continue;
       }
