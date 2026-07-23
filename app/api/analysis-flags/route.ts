@@ -3,6 +3,7 @@ import { CreateAnalysisFlagInputSchema } from "@/lib/schemas/analysisFlag";
 import { getCurrentUser } from "@/lib/services/auth";
 import { checkRateLimit } from "@/lib/services/rateLimit";
 import { resolveCallerContext } from "@/lib/api/clientIdentity";
+import { assertRequestNotTooLarge } from "@/lib/api/requestSize";
 import { jsonSuccess, jsonError } from "@/lib/api/response";
 import { InvalidRequestError, UnauthorizedError, RateLimitExceededError } from "@/lib/errors";
 
@@ -20,6 +21,7 @@ import { InvalidRequestError, UnauthorizedError, RateLimitExceededError } from "
 // outright rather than merely reading identity when present.
 export async function POST(req: Request) {
   try {
+    assertRequestNotTooLarge(req);
     const body = await req.json();
     const parsed = CreateAnalysisFlagInputSchema.safeParse(body);
 

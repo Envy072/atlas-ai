@@ -55,9 +55,35 @@ export const AnalysisSessionSchema = z.object({
 
 export type AnalysisSession = z.infer<typeof AnalysisSessionSchema>;
 
+// Length ceilings (Milestone 102), each sized to the field's own real
+// purpose rather than picked arbitrarily:
+//
+// startupIdea: the product's own stated shape for this field is "a
+// founder describes an idea in a few sentences" (CLAUDE.md's Project
+// Vision) — a short pitch, not a document. 2000 characters is several
+// times more than a thorough few-paragraph pitch needs, while still
+// bounding the real cost driver: this raw string is embedded, unchanged,
+// into every one of the ~5 sequential OpenAI prompts the real pipeline
+// issues per analysis (lib/services/openai.ts's five generation
+// exports), so its length is a cost *multiplier* across the whole
+// pipeline, not a one-off charge. A caller within the existing rate
+// limit could otherwise submit an unbounded string and multiply the
+// resulting token cost by the same factor on every call. 2000 also
+// matches this codebase's one other free-text input ceiling
+// (analysisFlag.ts's description field) — reusing an established,
+// already-reasoned bound instead of inventing a second number for the
+// same kind of decision keeps future schema additions predictable.
+//
+// title: an optional, cosmetic display label only (session history,
+// project lists) — never sent to OpenAI, so it carries no AI-cost risk.
+// 200 characters comfortably exceeds any real short label (a few words
+// to one sentence) while still preventing an oversized value from
+// breaking the fixed-width layouts that render it, and closes the same
+// "unbounded string field" pattern on general defensive-validation
+// grounds even where cost isn't the driving concern.
 export const CreateSessionInputSchema = z.object({
-  startupIdea: z.string().min(1),
-  title: z.string().min(1).optional(),
+  startupIdea: z.string().min(1).max(2000),
+  title: z.string().min(1).max(200).optional(),
 });
 
 export type CreateSessionInput = z.infer<typeof CreateSessionInputSchema>;

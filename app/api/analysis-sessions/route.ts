@@ -4,6 +4,7 @@ import { countProjectsThisMonth } from "@/lib/services/projects";
 import { FREE_TIER_MONTHLY_ANALYSIS_LIMIT } from "@/lib/services/stripe";
 import { checkRateLimit } from "@/lib/services/rateLimit";
 import { resolveCallerContext } from "@/lib/api/clientIdentity";
+import { assertRequestNotTooLarge } from "@/lib/api/requestSize";
 import { jsonSuccess, jsonError } from "@/lib/api/response";
 import { InvalidRequestError, UsageLimitExceededError, RateLimitExceededError } from "@/lib/errors";
 
@@ -47,6 +48,7 @@ export const maxDuration = 60;
 // query, cheapest-check-first.
 export async function POST(req: Request) {
   try {
+    assertRequestNotTooLarge(req);
     const body = await req.json();
     const parsed = CreateSessionInputSchema.safeParse(body);
 
