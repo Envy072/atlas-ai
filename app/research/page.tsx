@@ -1,23 +1,13 @@
-import { Search } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { H1 } from "@/components/ui/typography";
-import EmptyState from "@/components/shared/EmptyState";
+import { redirect } from "next/navigation";
 
-// An honest stub (MILESTONE_29_DESIGN.md Deliverable 8) — not a built
-// feature. A standalone research workspace is a future milestone;
-// market intelligence already appears inside each project's Decision
-// Report today.
+// No standalone research workspace exists (Milestone 101 review):
+// market intelligence is real but lives per-project
+// (MarketIntelligenceCard), and unlike Competitors' own company data,
+// it doesn't meaningfully aggregate across unrelated startup ideas — a
+// cheap, honest cross-project view isn't possible here the way it was
+// for /competitors. The nav entry that pointed here was removed
+// (Sidebar.tsx); this route redirects rather than 404s, for anyone who
+// still has it bookmarked or linked.
 export default function ResearchPage() {
-  return (
-    <div className="mx-auto max-w-5xl p-8">
-      <H1 className="mb-8">Market Research</H1>
-      <Card>
-        <EmptyState
-          icon={Search}
-          title="A dedicated research workspace is coming soon"
-          description="Market intelligence already appears inside each project's Decision Report — a standalone research view is planned for a future milestone."
-        />
-      </Card>
-    </div>
-  );
+  redirect("/projects");
 }
