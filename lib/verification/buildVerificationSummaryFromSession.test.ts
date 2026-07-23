@@ -42,8 +42,17 @@ describe("buildVerificationSummaryFromSession", () => {
       },
     });
 
-    const result = buildVerificationSummaryFromSession(session);
+    // Two independent calls to the real, current-timestamped
+    // buildVerificationSummary() — compared with generatedAt normalized
+    // to the same placeholder first, since each call captures its own
+    // "now" and the two can legitimately differ by a millisecond
+    // (confirmed under coverage instrumentation, where the extra
+    // overhead between calls made this observable). generatedAt is
+    // asserted separately as a valid timestamp instead of an exact match.
+    const result = buildVerificationSummaryFromSession(session)!;
+    const expected = buildVerificationSummary(profile);
 
-    expect(result).toEqual(buildVerificationSummary(profile));
+    expect({ ...result, generatedAt: "" }).toEqual({ ...expected, generatedAt: "" });
+    expect(Date.parse(result.generatedAt)).not.toBeNaN();
   });
 });
