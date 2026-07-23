@@ -34,6 +34,24 @@ describe("normalizeUrl", () => {
     expect(normalizeUrl("https://example.com/post?page=2")).toBe("https://example.com/post?page=2");
   });
 
+  it("strips an exact 'ref' tracking parameter", () => {
+    expect(normalizeUrl("https://example.com/post?ref=twitter")).toBe("https://example.com/post");
+  });
+
+  // Regression test for the confirmed over-matching defect (Milestone 94):
+  // "ref" previously matched by prefix, silently stripping any query key
+  // merely starting with those letters. Corrected to an exact match — a
+  // query key that legitimately starts with "ref" but isn't the literal
+  // tracking key "ref" must now be preserved.
+  it("keeps a non-tracking query parameter that merely starts with 'ref'", () => {
+    expect(normalizeUrl("https://example.com/post?referral_code=friend123")).toBe(
+      "https://example.com/post?referral_code=friend123"
+    );
+    expect(normalizeUrl("https://example.com/post?refresh_token=abc123")).toBe(
+      "https://example.com/post?refresh_token=abc123"
+    );
+  });
+
   it("recognizes two URLs differing only by tracking params, casing, and a trailing slash as the same normalized URL", () => {
     const withTracking = normalizeUrl("https://Example.com/post/?utm_source=newsletter&utm_medium=email");
     const withoutTracking = normalizeUrl("https://example.com/post");

@@ -4,7 +4,24 @@
 // Strips tracking params, trailing slashes, and lowercases the host, so
 // "https://Example.com/post/?utm_source=x" and "https://example.com/post"
 // are recognized as the same source later during deduplication.
-const TRACKING_PARAM_PREFIXES = ["utm_", "ref", "fbclid", "gclid"];
+//
+// "utm_" is a genuine prefix family (utm_source, utm_medium, utm_campaign,
+// utm_term, utm_content). The others are single, literal tracking keys,
+// not prefixes — matching them via startsWith() previously also stripped
+// unrelated keys that merely began with the same letters (e.g.
+// "referral_code" or "refresh_token" via a bare "ref" prefix). No
+// documented or observed contract elsewhere in this repository relies on
+// a broader "ref"-family of keys, so this is an exact match instead.
+const TRACKING_PARAM_KEY_PREFIXES = ["utm_"];
+const TRACKING_PARAM_EXACT_KEYS = new Set(["ref", "fbclid", "gclid"]);
+
+function isTrackingParam(key: string): boolean {
+  const lowerKey = key.toLowerCase();
+  return (
+    TRACKING_PARAM_KEY_PREFIXES.some((prefix) => lowerKey.startsWith(prefix)) ||
+    TRACKING_PARAM_EXACT_KEYS.has(lowerKey)
+  );
+}
 
 export function normalizeUrl(rawUrl: string): string {
   let url: URL;
@@ -18,7 +35,7 @@ export function normalizeUrl(rawUrl: string): string {
   url.hostname = url.hostname.toLowerCase();
 
   for (const key of Array.from(url.searchParams.keys())) {
-    if (TRACKING_PARAM_PREFIXES.some((prefix) => key.toLowerCase().startsWith(prefix))) {
+    if (isTrackingParam(key)) {
       url.searchParams.delete(key);
     }
   }
