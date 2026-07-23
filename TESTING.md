@@ -232,12 +232,12 @@ number today would be premature.
 Named honestly, not silently implied away (`MILESTONE_30_DESIGN.md`
 Non-Goals/Final Self Review):
 
-- Five of the six knowledge platforms (`lib/market`, `lib/financial`,
-  `lib/business`, `lib/competitors`, `lib/research`) have no dedicated
-  tests yet — `lib/decision/confidence/` is the proven template a
-  future milestone repeats for each.
-- `lib/services/openai.ts` isn't tested — mocking the OpenAI SDK
-  client is real, separate work.
+- All six knowledge platforms (`lib/market`, `lib/financial`,
+  `lib/business`, `lib/competitors`, `lib/research`, `lib/decision`) now
+  have dedicated test coverage, following the template
+  `lib/decision/confidence/` first proved (Milestones 52–99).
+- `lib/services/openai.ts` is covered (Milestone 34), mocking the OpenAI
+  SDK client itself — the one external boundary this file owns.
 - No end-to-end/browser tests (Playwright) and no React component
   tests (Testing Library) exist — both are a materially different,
   larger investment than unit/integration tests, deliberately deferred.

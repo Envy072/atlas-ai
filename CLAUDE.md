@@ -157,10 +157,10 @@ imports, and no knowledge of whether their caller is a route handler, a
 Server Component, or a future queue worker.
 
 **Hooks Layer** (`hooks/`) gives a component a request lifecycle — loading,
-error, success — around a service-backed operation. `useAnalyzeStartup`
-decides *how* a component observes an in-flight request, not *what* a valid
-analysis is. Hooks may call `lib/http/apiClient.ts` but must not embed
-business rules.
+error, success — around a service-backed operation. `useAnalysisSession`
+decides *how* a component observes an in-flight analysis session, not
+*what* a valid analysis is. Hooks may call `lib/http/apiClient.ts` but must
+not embed business rules.
 
 **Store Layer** (`lib/store/`) holds Zustand stores, used to share state
 across components without a direct parent-child relationship (e.g.
@@ -180,10 +180,10 @@ component, hook, or route handler.
 
 ```
 UI component (button click)
-  → hook (useAnalyzeStartup) manages loading state, calls apiClient
+  → hook (useAnalysisSession) manages session polling and state, calls apiClient
     → apiClient.postJSON (lib/http) sends the HTTP request
-      → API route (app/api/chat/route.ts) validates the request
-        → service (lib/services/analysis.ts) orchestrates the work
+      → API route (app/api/analysis-sessions/route.ts) validates the request
+        → service (lib/pipeline/engine/pipelineEngine.ts) orchestrates the work
           → service (lib/services/openai.ts) calls the external API
           → schema (lib/schemas/analysis.ts) validates the result
         → service (lib/services/projects.ts) persists the result
@@ -238,11 +238,11 @@ Treat as vendored — regenerate from shadcn, don't hand-edit business
 styling. Never: app-specific composites (those go in `components/shared/`).
 
 **`components/workspace/`** — the idea-analysis feature's cards, tabs,
-input surface, score display. Never: anything calling `/api/chat` without
-going through `hooks/useAnalyzeStartup`.
+input surface, score display. Never: anything calling
+`/api/analysis-sessions` without going through `hooks/useAnalysisSession`.
 
 **`hooks/`** — custom hooks wrapping a stateful async operation
-(`useAnalyzeStartup`). Never: pure stateless utilities (`lib/`), or rules
+(`useAnalysisSession`). Never: pure stateless utilities (`lib/`), or rules
 about what a valid analysis *is* (the schema's job).
 
 **`lib/api/`** — helpers shaping Next.js route responses (`jsonSuccess`,
@@ -280,7 +280,7 @@ platform-specific, anything with side effects, anything requiring
 `React`/`next/*`/an external SDK — that's `lib/services/` or a specific
 platform's own `utils/` instead.
 
-**`lib/store/`** — Zustand store definitions (`analysisStore.ts`). Never:
+**`lib/store/`** — Zustand store definitions (`sessionStore.ts`). Never:
 more than one store per genuinely distinct domain of shared state.
 
 **`lib/supabase/`** — the two shared Supabase client factories:
@@ -348,8 +348,8 @@ tests that genuinely don't belong to a single source file. See
   level, same order every render. Never inside a condition, loop, or nested
   function — not even "just this once."
 - **Custom hooks own a lifecycle, not a business rule.**
-  `useAnalyzeStartup` decides how a component observes a request; it does
-  not decide what counts as a valid analysis.
+  `useAnalysisSession` decides how a component observes an in-flight
+  analysis session; it does not decide what counts as a valid analysis.
 - **Refs are for values, not render output.** Mutating a ref during render
   is a bug (`react-hooks/refs` caught it once already here) — sync a ref
   from props/state inside `useEffect`, never inline in the render body.
@@ -367,23 +367,24 @@ tests that genuinely don't belong to a single source file. See
 ## 7. Zustand Rules
 
 - **One store per genuinely distinct domain of shared state.**
-  `analysisStore.ts` is the only store and should stay that way until a
+  `sessionStore.ts` is the only store and should stay that way until a
   truly unrelated domain appears (a future `authStore`). Don't split it up
   just to make one component's imports look tidier.
 - **Selectors, always:**
 
   ```ts
   // Correct
-  const analysis = useAnalysisStore((state) => state.analysis);
+  const view = useSessionStore((state) => state.view);
 
-  // Wrong — re-renders on every store change, not just `analysis`
-  const { analysis } = useAnalysisStore();
+  // Wrong — re-renders on every store change, not just `view`
+  const { view } = useSessionStore();
   ```
 
   Whole-store destructuring re-renders a component on *any* field change,
-  even fields it never reads. All fifteen current consumers were migrated
-  to selectors in Sprint 3 for exactly this reason; every new consumer
-  follows the same pattern from day one.
+  even fields it never reads. Every current consumer (`ProfileMenu`,
+  `Header`, `useAnalysisSession`) already reads via selector — never
+  whole-store destructuring — and every new consumer follows the same
+  pattern from day one.
 - **Actions live in the store, not scattered across components.**
   `setLoading`, `setAnalysis`, `reset` are defined once; callers invoke
   them rather than computing partial updates inline.
@@ -462,14 +463,13 @@ the full architecture.
 
 **Analysis service** (`analysis.ts`) — named here since Milestone 1,
 deleted alongside `openai.ts` at Milestone 25 as part of the same retired
-legacy flow. Unlike `openai.ts`, no replacement for this file has been
-built as of Milestone 34 — Decision Intelligence's own
-`lib/decision/findings/findingBuilder.ts` now plays the equivalent
-"orchestrate generation, then validate" role for findings specifically,
-but no general-purpose successor to `analysis.ts` itself exists. This
-paragraph is flagged here as known-stale, not rewritten — matching this
-project's own established practice of naming a documentation drift
-without fixing something outside the current milestone's scope.
+legacy flow. No single file replaced it directly:
+`lib/pipeline/engine/pipelineEngine.ts` now orchestrates the six knowledge
+platforms (`lib/research`, `lib/competitors`, `lib/market`,
+`lib/financial`, `lib/business`, `lib/decision`) end to end, invoked from
+`app/api/analysis-sessions/route.ts` — the real, live, fully test-covered
+successor architecture (Milestone 91's own `pipelineEngine.ts` test
+coverage), not a single-file equivalent.
 
 **Projects service** (`projects.ts`) owns all reads/writes to the Supabase
 `projects` table. `persistProjectFromSession` logs and swallows a failure
@@ -637,10 +637,10 @@ tokens already do this on `components/ui/` — don't override them away).
   (possibly as a more specific type), logs and returns a safe fallback (as
   `projects.ts` does for a failed insert/select, deliberately), or both. A
   bare `catch {}` with no logging and no rethrow is never acceptable.
-- **Client and server both validate.** `useAnalyzeStartup` re-validates the
-  API response against the same schema the server already checked — looks
-  redundant, is deliberate: a client never trusts a shape just because the
-  server "should" have checked it.
+- **Client and server both validate.** `useAnalysisSession` re-validates
+  each polled session response against the same schema the server already
+  checked — looks redundant, is deliberate: a client never trusts a shape
+  just because the server "should" have checked it.
 - **User-facing messages come from `AppError.message` only.** `jsonError`
   exposes an `AppError`'s message as-is (authored to be safe to show), but
   replaces any *unexpected* error's message with a generic fallback while
@@ -653,9 +653,10 @@ tokens already do this on `components/ui/` — don't override them away).
 
 - **Routes are thin controllers, nothing else.** Parse/validate the
   request, call one service (or a small sequence), map the result/thrown
-  error to a response. `app/api/chat/route.ts` pre-/post-Sprint-3 is the
-  reference: from a handler mixing OpenAI calls, JSON parsing, and Supabase
-  writes, to a five-line orchestration of services.
+  error to a response. `app/api/analysis-sessions/route.ts` is the
+  reference: request validation and a short orchestration of
+  `lib/analysis-session` and `lib/pipeline` services, with no OpenAI/
+  Supabase calls inlined into the handler itself.
 - **Business logic belongs in services, always.** About to write
   `openai.chat.completions.create(...)` or `supabase.from(...)` inside a
   route handler? Stop — that call belongs in `lib/services/`.
@@ -678,9 +679,9 @@ tokens already do this on `components/ui/` — don't override them away).
   the OpenAI response before it's persisted or returned. A "return exactly
   this JSON schema" prompt instruction is a strong hint to the model, never
   an enforced contract.
-- **Always validate API responses, even your own.** `useAnalyzeStartup`
-  re-validates `/api/chat`'s response rather than trusting the route got it
-  right every time.
+- **Always validate API responses, even your own.** `useAnalysisSession`
+  re-validates `/api/analysis-sessions`'s response rather than trusting the
+  route got it right every time.
 - **One schema per shape, reused everywhere.** `AnalysisResultSchema` is
   defined once and imported by the service, route, hook, and store's type.
   A new shared shape gets the same treatment — one schema, one inferred
@@ -697,9 +698,10 @@ tokens already do this on `components/ui/` — don't override them away).
 - **Memoize with a reason, not by default.** `useMemo`/`useCallback` are
   for measured or clearly-predictable cost, not a reflex on every value.
 - **Stabilize identities where it actually matters.**
-  `useAnalyzeStartup` keeps `analyze`'s identity stable via a ref + effect
-  (not a dependency on the caller's inline callbacks object), since callers
-  pass a fresh object every render. Follow this pattern when a hook's
+  `useAnalysisSession` keeps its polling function's identity stable via a
+  ref + effect (not a dependency on the caller's inline callbacks object),
+  following the same convention the retired `useAnalyzeStartup` first
+  established. Follow this pattern when a hook's
   returned function would otherwise churn identity for no functional reason.
 - **Avoid duplicated renders from shared state.** Zustand selectors
   (Section 7) so a component only re-renders when the field it reads changes.
@@ -743,23 +745,21 @@ tokens already do this on `components/ui/` — don't override them away).
   through `lib/services/openai.ts`.
 - **Secrets are rotated, not just removed, if leaked.** Removing a key from
   a future commit does not undo its exposure in git history.
-- **Validate input for security, not just correctness.** `/api/chat` has no
-  request size limit and no rate limiting today — a single caller could
-  send an arbitrarily large message or loop the route to drive OpenAI
-  spend. This is an open item (Milestone 6); don't add a new unauthenticated
-  endpoint with the same gap without flagging it.
-- **Analysis session ids are sequential and guessable, not cryptographically
-  random** (`lib/analysis-session/utils/id.ts`'s `nextSessionId()`:
-  `` `session_${Date.now()}_${counter}` ``). Since `/api/analysis-sessions/[id]`
-  and its `cancel`/`retry` siblings are deliberately public (anonymous
-  users may run and view an analysis — Milestone 27's approved product
-  decision), anyone who can guess or enumerate a nearby id can read,
-  cancel, or retry a session they didn't start. Named explicitly as an
-  open hardening task at Milestone 27c's own review, deliberately not
-  fixed there or by any milestone since — fixing it means either
-  switching to an unguessable id scheme or gating those routes (the
-  latter contradicts the anonymous-analysis decision), a call for
-  whoever picks this up next.
+- **Validate input for security, not just correctness.** Every real
+  endpoint that spends OpenAI budget (`app/api/analysis-sessions`) is now
+  rate-limited by caller tier (`lib/services/rateLimit/`, Milestone 47).
+  Explicit request-body size limiting is still not enforced anywhere —
+  flag this gap on any new unauthenticated endpoint rather than assuming
+  rate limiting alone covers it.
+- **Analysis session ids are cryptographically random, not sequential**
+  (`lib/analysis-session/utils/id.ts`'s `nextSessionId()`:
+  `` `session_${randomUUID()}` ``) — fixed at Milestone 47 after being
+  flagged as an open hardening item at Milestone 27c's own review. A
+  signed-in caller can also only read/cancel/retry their own session via a
+  real `ownerId` check (`sessionLifecycle.ts`), with a mismatch treated
+  identically to "doesn't exist" to avoid an enumeration side-channel;
+  anonymous sessions remain exactly as open as the Milestone 27 product
+  decision intended.
 
 ---
 
@@ -902,25 +902,29 @@ task is done (Section 19).
 Ordered by leverage — earlier milestones unblock later ones — not by
 calendar date. None are scheduled to a specific sprint yet.
 
-**Milestone 1 — Unify the analyze-idea implementation.** Two parallel
-implementations exist today: `AIWorkspace` (local state, live on
-`/dashboard`) and the `Workspace`/`Tabs`/Zustand tree (fully built, not
-routed anywhere). Decide which is canonical and retire the other's
-duplication. The single highest-leverage remaining piece of architectural
-debt.
+**Milestone 1 — Unify the analyze-idea implementation.** ✅ **Complete**,
+delivered at Milestone 14: `AIWorkspace` is the sole live implementation at
+`/dashboard/analysis`. The earlier parallel `Workspace`/`Tabs`/Zustand tree
+this milestone once named no longer exists anywhere in the codebase.
 
-**Milestone 2 — Surface the full AI output.** `strengths`, `weaknesses`,
-`risks`, `opportunities`, `next_steps`, `verdict`, `confidence`,
-`investment_decision`, and four sub-scores are generated but never shown on
-the live route. Wire the existing (orphaned) `RisksCard`/
-`OpportunitiesCard`/`FinancialCard`/`WorkspaceHeader` into the canonical
-implementation from Milestone 1, or build replacements if the design changes.
+**Milestone 2 — Surface the full AI output.** ✅ **Substantially complete**,
+via a different path than originally planned. The orphaned components this
+milestone once named (`RisksCard`/`OpportunitiesCard`/`FinancialCard`/
+`WorkspaceHeader`) were never wired in and no longer exist. Instead,
+Decision Intelligence's own `DecisionReport`
+(`components/workspace/decision-report/`) surfaces findings, risks,
+market/financial/business intelligence, recommendations, verdict, and
+confidence end to end (Milestones 21–24, 33–38), reading from
+`buildDecisionArtifacts()`.
 
-**Milestone 3 — Complete the surrounding product surface.** Fix
-`/competitors` (currently renders a pasted copy of `/projects`). Add a
-project detail route. Make dashboard search functional. Replace the static
-stub pages (`/pricing`, `/reports`, `/research`, `/settings`) as each
-becomes a priority.
+**Milestone 3 — Complete the surrounding product surface.** Partially
+complete. `/competitors` now shows a real aggregation of the signed-in
+user's own competitors (no longer a copy-paste bug); a full project detail
+route exists (`/projects/[id]`, the Decision Report surface); `/pricing` is
+real (Milestone 43–44). Still open: dashboard search is decorative with no
+handler (Section 9's own accessibility gap note); `/reports`, `/research`,
+and `/settings`' Account tab remain deliberate, explicitly-labeled stubs
+(`MILESTONE_29_DESIGN.md` Deliverable 8).
 
 **Milestone 4 — Authentication & multi-tenancy.** ✅ **Complete**, delivered
 across Milestones 27a–28: a real `lib/services/auth.ts` session model
@@ -929,15 +933,22 @@ unused column (27c); user-specific routes gate behind a real session
 check (27b); and the hardcoded "Yasin / Founder" identity is replaced
 with the real signed-in user throughout the dashboard shell (28).
 
-**Milestone 5 — Billing.** `lib/services/stripe.ts` plus a
-pricing/subscription model — checkout, plan tiers, usage limits tied to a
-real account (enabled by Milestone 4). `/pricing` becomes real.
+**Milestone 5 — Billing.** ✅ **Complete**, delivered across Milestones
+43–45: `lib/services/stripe.ts` owns the real Stripe integration (Payment
+Links, webhook-driven subscription sync, a real Billing Portal); `/pricing`
+and `/settings/billing` are both real, reading live tier/subscription
+state; `FREE_TIER_MONTHLY_ANALYSIS_LIMIT` enforces the Free tier's real
+usage cap.
 
-**Milestone 6 — Reliability & scale hardening.** Rate limiting and
-request-size limits on `/api/chat` and future external routes. Streaming AI
-responses (the unused `ai` dependency exists for this). Route-level
-`error.tsx`/`loading.tsx`. Retry/backoff for transient OpenAI/Supabase
-failures.
+**Milestone 6 — Reliability & scale hardening.** Partially complete. Rate
+limiting is done (Milestone 47, `lib/services/rateLimit/`, enforced on
+`analysis-sessions` and `billing/portal`). Route-level `error.tsx`/
+`loading.tsx` exist for the main authenticated surfaces (`app/`,
+`/dashboard`, `/projects`, `/settings/billing`, `/settings/usage`,
+`/dashboard/analysis`). Still open: streaming AI responses (the `ai`
+dependency remains installed and unused) and a deliberate, project-built
+retry/backoff policy beyond the OpenAI SDK's own inherited `maxRetries: 2`
+default.
 
 **Milestone 7 — Testing & CI/CD.** ✅ **Delivered** (Milestone 30): a real
 Vitest test suite — unit tests for the cross-cutting utilities and the
