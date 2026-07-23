@@ -4,9 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { WebhookVerificationError, ExternalServiceError, InvalidRequestError } from "@/lib/errors";
 import type { SubscriptionTier, SubscriptionStatus } from "@/lib/schemas/subscription";
 
-// The upper bound of the pricing page's own "1-2 analyses per month"
-// Free tier copy (app/pricing/page.tsx) — a real, adjustable policy
-// value, not a placeholder, exactly like lib/competitors/refresh's own
+// The pricing page's own "2 analyses per month" Free tier copy
+// (app/pricing/page.tsx) — a real, adjustable policy value, not a
+// placeholder, exactly like lib/competitors/refresh's own
 // REFRESH_INTERVAL_DAYS. One named constant, imported wherever
 // enforcement needs it, rather than a magic number repeated at each
 // call site.

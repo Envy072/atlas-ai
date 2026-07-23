@@ -22,14 +22,20 @@ interface PricingTier {
 // Product's own price (MILESTONE_44_DESIGN.md correction; the $29 figure
 // this page originally showed was settled from Milestone 43's open
 // $29-39 range before the real Stripe Product existed, in the wrong
-// currency).
+// currency). Free tier's "2 analyses per month" mirrors
+// lib/services/stripe.ts's own FREE_TIER_MONTHLY_ANALYSIS_LIMIT exactly
+// — this page previously said "1-2," which didn't match the single
+// fixed enforced value (Milestone 100 correction). "History kept for 30
+// days" was removed the same milestone: no retention/expiry mechanism
+// for project history exists anywhere in this codebase, so the claim
+// was never true.
 const TIERS: PricingTier[] = [
   {
     name: "Free",
     price: "£0",
     cadence: "forever",
     description: "Try Atlas AI on a real idea before committing to anything.",
-    features: ["1-2 analyses per month", "Executive Summary only", "History kept for 30 days"],
+    features: ["2 analyses per month", "Executive Summary only"],
   },
   {
     name: "Founder",

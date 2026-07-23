@@ -42,7 +42,7 @@ const features = [
 
 export default function Features() {
   return (
-    <section className="bg-gray-50 py-28">
+    <section id="features" className="bg-gray-50 py-28">
       <div className="mx-auto max-w-7xl px-6">
 
         <div className="text-center">

@@ -54,13 +54,21 @@ export default async function BillingPage() {
               label="Renewal Date"
               value={subscription.currentPeriodEnd ? formatDate(subscription.currentPeriodEnd) : "Unavailable"}
             />
-            <StatCell label="Subscription ID" value={subscription.stripeSubscriptionId} />
-            <StatCell label="Stripe Customer ID" value={subscription.stripeCustomerId} className="sm:col-span-2" />
           </div>
 
           <Button className="mt-8" render={<Link href="/api/billing/portal" />}>
             Manage Billing
           </Button>
+
+          <details className="mt-8 border-t pt-4">
+            <summary className="cursor-pointer text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              Support details
+            </summary>
+            <div className="mt-4 grid grid-cols-1 gap-8 sm:grid-cols-2">
+              <StatCell label="Subscription ID" value={subscription.stripeSubscriptionId} />
+              <StatCell label="Stripe Customer ID" value={subscription.stripeCustomerId} className="sm:col-span-2" />
+            </div>
+          </details>
         </Card>
       ) : (
         <Card>
