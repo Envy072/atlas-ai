@@ -1,6 +1,6 @@
 import type { PipelineExecutionStore } from "@/lib/pipeline/types/storage";
 import { MemoryPipelineStore } from "@/lib/pipeline/storage/memoryStore";
-import { SupabasePipelineStore } from "@/lib/pipeline/storage/supabaseStore";
+import { createSupabasePipelineStore } from "@/lib/pipeline/storage/supabaseStore";
 
 // Milestone 50 — the raw-Postgres and Warehouse backends were both
 // always "ARCHITECTURE ONLY" (every method threw "not implemented
@@ -25,7 +25,7 @@ export function createStore(options: CreatePipelineStoreOptions = {}): PipelineE
     case "memory":
       return new MemoryPipelineStore();
     case "supabase":
-      return new SupabasePipelineStore(options.supabaseTableName);
+      return createSupabasePipelineStore(options.supabaseTableName);
     default: {
       const exhaustiveCheck: never = backend;
       throw new Error(`Unknown pipeline store backend: ${exhaustiveCheck}`);

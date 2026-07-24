@@ -18,6 +18,13 @@ export type StartPipelineInput = z.infer<typeof StartPipelineInputSchema>;
 // as separate counters); `progress` and `errorSummary` are both derived
 // facts recomputed at each transition, not independently-maintained
 // state that could drift from `stageHistory`.
+// `version` (Milestone 107's approved concurrency design) — an
+// optimistic-concurrency guard, not a duplicated fact derivable from
+// anything else: 0 means "not yet persisted" (buildInitialExecution's
+// own starting value); every successful write increments it by exactly
+// one. Every write to this record must be conditional on the version
+// last read, never a blind overwrite, once persisted for real — see
+// lib/pipeline/checkpoint/checkpointWriter.ts.
 export const PipelineExecutionSchema = z.object({
   id: z.string(),
   startupIdea: z.string().min(1),
@@ -27,6 +34,7 @@ export const PipelineExecutionSchema = z.object({
   stageHistory: z.array(StageRecordSchema),
   progress: ProgressSnapshotSchema,
   errorSummary: z.string().optional(),
+  version: z.number().int().nonnegative(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

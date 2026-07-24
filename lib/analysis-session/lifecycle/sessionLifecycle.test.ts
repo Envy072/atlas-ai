@@ -1,4 +1,23 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// The pipeline layer's own default store is real Supabase-backed as of
+// Milestone 107 (createSession() delegates to startPipeline()
+// internally, with no store parameter of its own to override). Mocked
+// at the same level Milestone 106 mocked the analysis-session store's
+// own default — the factory itself — with a real MemoryPipelineStore
+// substituted underneath, rather than trying to simulate Supabase row
+// semantics: this file's subject is ownership enforcement, not
+// persistence, and a real in-memory store lets the actual pipeline
+// orchestration run and be read back correctly with zero behavioral
+// approximation. One shared instance for this file's whole run, exactly
+// like pipelineEngine.ts's own real defaultStore binding — evaluated
+// once at module load, not once per call.
+vi.mock("@/lib/pipeline/storage/createStore", async () => {
+  const { MemoryPipelineStore } = await import("@/lib/pipeline/storage/memoryStore");
+  const store = new MemoryPipelineStore();
+  return { createStore: () => store };
+});
+
 import { createSession, getSession, cancelSession, retrySession } from "@/lib/analysis-session/lifecycle/sessionLifecycle";
 import { MemoryAnalysisSessionStore } from "@/lib/analysis-session/storage/memoryStore";
 

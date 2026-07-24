@@ -101,6 +101,24 @@ export class RateLimitExceededError extends AppError {
   }
 }
 
+// A caller-visible signal that a bounded conflict-retry loop never
+// resolved (Milestone 107's approved concurrency design, "Retry Strategy
+// → Error propagation") — deliberately distinct from a single, internal
+// CheckpointConflictError (lib/pipeline/checkpoint/checkpointWriter.ts,
+// caught and reconciled internally on nearly every occurrence): this
+// class represents retries being genuinely exhausted, a real, rare,
+// internal-invariant-adjacent failure that must never be misclassified
+// as an ordinary, user-retryable stage failure (retrying a stage the
+// user's own UI already offers could re-run work that actually already
+// succeeded).
+export class ConcurrencyConflictError extends AppError {
+  constructor(message = "This operation could not complete due to a persistent write conflict. Please try again.") {
+    super(message, { status: 409, code: "concurrency_conflict" });
+    this.name = "ConcurrencyConflictError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;

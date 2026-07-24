@@ -21,6 +21,20 @@ vi.mock("@/lib/analysis-session/storage/defaultStore", async () => {
   return { defaultAnalysisSessionStore: new MemoryAnalysisSessionStore() };
 });
 
+// The pipeline layer's own default store is real Supabase-backed as of
+// Milestone 107 — startAnalysisSession() reaches it transitively through
+// createSession()/startPipeline(), with no store parameter of its own to
+// override the way the analysis-session store above has. Mocked at the
+// factory level with a real MemoryPipelineStore underneath (one shared
+// instance for this file's whole run), rather than simulating Supabase
+// row semantics — this file's subject is analysisSessions.ts's own
+// orchestration, not persistence.
+vi.mock("@/lib/pipeline/storage/createStore", async () => {
+  const { MemoryPipelineStore } = await import("@/lib/pipeline/storage/memoryStore");
+  const store = new MemoryPipelineStore();
+  return { createStore: () => store };
+});
+
 import { createClient } from "@/lib/supabase/server";
 import {
   startAnalysisSession,

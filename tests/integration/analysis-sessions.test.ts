@@ -25,6 +25,18 @@ vi.mock("@/lib/analysis-session/storage/defaultStore", async () => {
   return { defaultAnalysisSessionStore: new MemoryAnalysisSessionStore() };
 });
 
+// The pipeline layer's own default store is real Supabase-backed as of
+// Milestone 107, with no store parameter of its own for the route to
+// override the way it can for the analysis-session store above. Mocked
+// at the factory level with a real MemoryPipelineStore underneath, for
+// the same reason as above — this file's subject is the route/lifecycle
+// composition, not persistence.
+vi.mock("@/lib/pipeline/storage/createStore", async () => {
+  const { MemoryPipelineStore } = await import("@/lib/pipeline/storage/memoryStore");
+  const store = new MemoryPipelineStore();
+  return { createStore: () => store };
+});
+
 // Milestone 44's monthly-limit check: getUserTier()/countProjectsThisMonth()'s
 // own internal correctness is already covered by their real unit tests
 // (lib/services/stripe.test.ts, lib/services/projects.test.ts) — mocked

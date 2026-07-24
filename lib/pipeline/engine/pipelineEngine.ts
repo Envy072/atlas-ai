@@ -1,4 +1,4 @@
-import { InvalidRequestError, getErrorMessage } from "@/lib/errors";
+import { InvalidRequestError, ConcurrencyConflictError, getErrorMessage } from "@/lib/errors";
 import { parseOrThrow } from "@/lib/validation/parse";
 import type { PipelineContext } from "@/lib/pipeline/schemas/context.schema";
 import type { StageRecord } from "@/lib/pipeline/schemas/stage.schema";
@@ -17,7 +17,7 @@ import {
   nextAttemptNumber,
 } from "@/lib/pipeline/retry";
 import { emitPipelineEvent, subscribeToExecution } from "@/lib/pipeline/events/eventEmitter";
-import { writeCheckpoint } from "@/lib/pipeline/checkpoint/checkpointWriter";
+import { writeCheckpoint, CheckpointConflictError } from "@/lib/pipeline/checkpoint/checkpointWriter";
 import { createStore } from "@/lib/pipeline/storage/createStore";
 import {
   researchStage,
@@ -29,13 +29,17 @@ import {
 } from "@/lib/pipeline/stages";
 
 // The one default store this whole engine operates against unless a
-// caller supplies its own (e.g. a future Supabase-backed one) — the same
-// zero-config default every Phase 1 platform's own createStore() offers,
-// but held here as a live instance because, unlike a knowledge platform,
-// this engine's own responsibility (Section 3) includes persisting its
-// own execution state automatically after every transition, not leaving
-// persistence to the caller.
-const defaultStore: PipelineExecutionStore = createStore();
+// caller supplies its own. Explicitly requests "supabase" (Milestone
+// 107) rather than relying on createStore()'s own "memory" default —
+// that default stays unchanged for any other caller (e.g. this engine's
+// own tests, which construct a MemoryPipelineStore directly and never
+// touch this binding) so it keeps meaning "an in-memory store"
+// everywhere else. Safe to construct eagerly here, unlike the mistake
+// Milestone 106 first made and then fixed: createSupabasePipelineStore()
+// only builds closures and defers its own real Supabase client
+// construction until a method is actually called (see its own comment),
+// so importing this module never touches live credentials by itself.
+const defaultStore: PipelineExecutionStore = createStore({ backend: "supabase" });
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -46,21 +50,96 @@ function transitionTo(execution: PipelineExecution, state: PipelineState, now: D
   return { ...execution, state, updatedAt: now.toISOString() };
 }
 
-// Re-fetches the persisted state before a checkpoint write that would
-// otherwise blindly carry forward an in-memory `state` value — this is
-// what stops a stage that was already in flight when cancelPipeline()
-// landed from clobbering "cancelling" back to "running" once it finishes
-// (MILESTONE_11_DESIGN.md Section 9's cooperative cancellation only
-// works if a concurrently-requested cancellation can never be silently
-// overwritten by the stage that was already running when it was
-// requested).
-async function checkpointPreservingConcurrentState(
+// Replaces the old re-fetch-then-blindly-preserve-state approach
+// (Milestone 104A ADR / Milestone 107's approved concurrency design):
+// that pattern only "worked" because an in-memory store never yields to
+// the event loop between its own read and write, making the gap a
+// cancelPipeline() call could land in vanishingly small. A real,
+// network-latency-backed store (Milestone 107) makes that same gap
+// genuinely exploitable — the underlying schema.upsertWithVersionCheck
+// call inside writeCheckpoint() is what actually closes it, by refusing
+// to persist a stale version at all rather than hoping nothing landed
+// in between.
+//
+// On a version conflict, this function reconciles by yielding to a
+// concurrently-committed cancellation rather than retrying its own
+// original transition — a stage that was already in flight when
+// cancelPipeline() landed must observe "cancelling"/"cancelled" and stop,
+// never overwrite it (Milestone 107's approved design, "Cancellation
+// Semantics"). No other legitimate concurrent writer exists in this
+// design; a conflict explained by anything else is a genuine,
+// unexpected invariant violation and propagates uncaught, matching this
+// module's own established precedent for a schema-validation failure.
+async function writeCheckpointYieldingToCancellation(
   store: PipelineExecutionStore,
   execution: PipelineExecution
 ): Promise<PipelineExecution> {
-  const latest = await store.getById(execution.id);
-  const preserved = latest ? { ...execution, state: latest.state } : execution;
-  return writeCheckpoint(store, preserved);
+  try {
+    return await writeCheckpoint(store, execution);
+  } catch (error) {
+    if (!(error instanceof CheckpointConflictError)) throw error;
+
+    const { current } = error;
+    if (current.state === "cancelled") return current;
+    if (current.state === "cancelling") {
+      // Preserve this call's OWN update (e.g. a stage's own successful
+      // result, already applied to `execution` in memory) rather than
+      // discarding it in favor of the fresh row's — a stage that
+      // completed successfully keeps its own history even though the
+      // pipeline is ending in "cancelled", exactly as it would have if
+      // cancellation had never raced it. Only `state` and `version` come
+      // from the fresh row, since those are what the conflict actually
+      // revealed; everything else is this call's own already-computed
+      // result.
+      const reconciled = { ...execution, state: current.state, version: current.version };
+      return writeCheckpoint(store, transitionTo(reconciled, "cancelled", new Date()));
+    }
+
+    throw error;
+  }
+}
+
+const MAX_CANCEL_CONFLICT_RETRIES = 3;
+
+// stage_failed/retry_pending cancel immediately; any other (non-terminal)
+// state means a stage is genuinely in flight, so cancellation is a
+// two-phase "mark cancelling, let the running loop observe it" instead —
+// exactly cancelPipeline()'s own pre-existing branching, now factored out
+// so it can be recomputed on every retry attempt below (never fixed
+// upfront), since a conflict can itself change which of the two paths is
+// now correct.
+function cancelTargetState(state: PipelineState): "cancelled" | "cancelling" {
+  return state === "stage_failed" || state === "retry_pending" ? "cancelled" : "cancelling";
+}
+
+// Unlike writeCheckpointYieldingToCancellation above, cancelPipeline()'s
+// own write must never yield to anything — a user-requested cancellation
+// should always eventually take effect while the execution hasn't
+// already finished (Milestone 107's approved design, "Cancellation
+// Semantics" + "Retry Strategy"). On a version conflict, re-fetch and
+// retry the same logical intent (cancel) against the fresh state —
+// re-deriving the correct target via cancelTargetState each time, since
+// the conflict itself may have changed which path applies — bounded, and
+// short-circuiting early if the execution has already reached a
+// terminal state (nothing left to cancel).
+async function cancelWithRetry(store: PipelineExecutionStore, checkpoint: PipelineExecution): Promise<PipelineExecution> {
+  let current = checkpoint;
+
+  for (let attempt = 0; attempt < MAX_CANCEL_CONFLICT_RETRIES; attempt++) {
+    if (isTerminalState(current.state)) return current;
+
+    try {
+      const transitioned = transitionTo(current, cancelTargetState(current.state), new Date());
+      return await writeCheckpoint(store, transitioned);
+    } catch (error) {
+      if (!(error instanceof CheckpointConflictError)) throw error;
+      current = error.current;
+    }
+  }
+
+  throw new ConcurrencyConflictError(
+    `Could not cancel execution "${checkpoint.id}" after ${MAX_CANCEL_CONFLICT_RETRIES} conflicting attempts.`
+  );
 }
 
 // Runs one stage to completion, retrying automatically per `policy` on
@@ -124,7 +203,8 @@ async function executeStageWithRetry<TResult>(
           attempt,
           message,
         });
-        current = await writeCheckpoint(store, current);
+        current = await writeCheckpointYieldingToCancellation(store, current);
+        if (current.state === "cancelled") return current;
 
         await sleep(computeBackoffMs(policy, autoRetriesSoFar + 1));
 
@@ -139,12 +219,11 @@ async function executeStageWithRetry<TResult>(
         current = transitionTo(current, "running", new Date());
         // Persisted immediately, like every other transition in this
         // function — otherwise the store's last real write stays
-        // "retry_pending" through the next attempt, and
-        // checkpointPreservingConcurrentState (which trusts the store as
-        // the source of truth for exactly this reason) would silently
-        // revert a subsequent successful attempt's state back to
-        // "retry_pending", corrupting it.
-        current = await writeCheckpoint(store, current);
+        // "retry_pending" through the next attempt, and a subsequent
+        // successful attempt's own checkpoint could conflict against a
+        // version this loop itself never advanced.
+        current = await writeCheckpointYieldingToCancellation(store, current);
+        if (current.state === "cancelled") return current;
         trigger = "auto_retry";
         continue;
       }
@@ -167,7 +246,7 @@ async function executeStageWithRetry<TResult>(
         attempt,
         message,
       });
-      current = await writeCheckpoint(store, current);
+      current = await writeCheckpointYieldingToCancellation(store, current);
       return current;
     }
 
@@ -199,7 +278,7 @@ async function executeStageWithRetry<TResult>(
       stage: stage.name,
       attempt,
     });
-    current = await checkpointPreservingConcurrentState(store, current);
+    current = await writeCheckpointYieldingToCancellation(store, current);
     return current;
   }
 }
@@ -291,7 +370,7 @@ async function runFromCurrentStage(
     if (latest && latest.state === "cancelling") {
       current = transitionTo(latest, "cancelled", new Date());
       emitPipelineEvent({ type: "pipeline.cancelled", executionId: current.id, timestamp: current.updatedAt });
-      current = await writeCheckpoint(store, current);
+      current = await writeCheckpointYieldingToCancellation(store, current);
       return current;
     }
 
@@ -307,7 +386,7 @@ async function runFromCurrentStage(
 
   current = transitionTo(current, "completed", new Date());
   emitPipelineEvent({ type: "pipeline.completed", executionId: current.id, timestamp: current.updatedAt });
-  current = await writeCheckpoint(store, current);
+  current = await writeCheckpointYieldingToCancellation(store, current);
   return current;
 }
 
@@ -352,7 +431,8 @@ export async function resumePipeline(
   }
 
   let execution = transitionTo(checkpoint, "running");
-  execution = await writeCheckpoint(store, execution);
+  execution = await writeCheckpointYieldingToCancellation(store, execution);
+  if (execution.state === "cancelled") return execution;
   return runFromCurrentStage(execution, store, "resumed");
 }
 
@@ -374,7 +454,8 @@ export async function retryStage(
   }
 
   let execution = transitionTo(checkpoint, "running");
-  execution = await writeCheckpoint(store, execution);
+  execution = await writeCheckpointYieldingToCancellation(store, execution);
+  if (execution.state === "cancelled") return execution;
   return runFromCurrentStage(execution, store, "manual_retry");
 }
 
@@ -391,21 +472,21 @@ export async function cancelPipeline(
   }
   if (isTerminalState(checkpoint.state)) return checkpoint;
 
-  if (checkpoint.state === "stage_failed" || checkpoint.state === "retry_pending") {
-    // No stage is actually in flight right now (just a scheduled retry
-    // or a paused failure) — cancel immediately.
-    let execution = transitionTo(checkpoint, "cancelled");
-    emitPipelineEvent({ type: "pipeline.cancelled", executionId, timestamp: execution.updatedAt });
-    execution = await writeCheckpoint(store, execution);
-    return execution;
-  }
+  // cancelTargetState decides "cancel immediately" (stage_failed/
+  // retry_pending — no stage in flight) vs. "mark cancelling, let the
+  // running loop or the backoff wait inside executeStageWithRetry
+  // observe it" (any other, non-terminal state — a stage is genuinely in
+  // flight) — cancelWithRetry re-derives this on every conflict-retry
+  // attempt, never fixing it upfront, since a conflict can itself change
+  // which path is now correct.
+  const execution = await cancelWithRetry(store, checkpoint);
 
-  // state is "running" — a stage is genuinely in flight; mark
-  // "cancelling" and let the running loop (or the backoff wait inside
-  // executeStageWithRetry) observe it at the next opportunity.
-  let execution = transitionTo(checkpoint, "cancelling");
-  emitPipelineEvent({ type: "pipeline.cancelling", executionId, timestamp: execution.updatedAt });
-  execution = await writeCheckpoint(store, execution);
+  emitPipelineEvent({
+    type: execution.state === "cancelled" ? "pipeline.cancelled" : "pipeline.cancelling",
+    executionId,
+    timestamp: execution.updatedAt,
+  });
+
   return execution;
 }
 

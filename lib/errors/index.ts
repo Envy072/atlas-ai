@@ -7,6 +7,7 @@ export {
   WebhookVerificationError,
   UsageLimitExceededError,
   RateLimitExceededError,
+  ConcurrencyConflictError,
   getErrorMessage,
   getErrorStatus,
 } from "./AppError";

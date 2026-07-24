@@ -26,6 +26,19 @@ export interface MockSupabaseClientOptions {
   upsertResult?: { error: MockSupabaseError | null };
   /** What the terminal `.delete().eq()` call resolves to (Milestone 105). */
   deleteResult?: { error: MockSupabaseError | null };
+  /**
+   * What the terminal `.update().eq().eq().select()` call resolves to
+   * (Milestone 107 — the version-conditional write
+   * lib/pipeline/storage/supabaseStore.ts's optimistic-concurrency
+   * mechanism depends on). Defaults to a non-empty row (a matched,
+   * successful update) — the harmless default every other operation
+   * here already uses — so a caller exercising a real, multi-write
+   * pipeline run against this generic mock (e.g. a test whose actual
+   * subject is business logic, not persistence conflict handling) isn't
+   * surprised by an every-write "conflict." Set `{ data: [], error:
+   * null }` explicitly to simulate a lost version race instead.
+   */
+  updateResult?: MockSupabaseResult<unknown[]>;
 }
 
 // A small, hand-rolled mock implementing only the exact Supabase
@@ -56,6 +69,7 @@ export function createMockSupabaseClient(options: MockSupabaseClientOptions = {}
   const rpcResult = options.rpcResult ?? { data: null, error: null };
   const upsertResult = options.upsertResult ?? { error: null };
   const deleteResult = options.deleteResult ?? { error: null };
+  const updateResult = options.updateResult ?? { data: [{}], error: null };
 
   const eq = vi.fn(() => queryBuilder);
   const order = vi.fn(() => Promise.resolve(selectResult));
@@ -75,7 +89,16 @@ export function createMockSupabaseClient(options: MockSupabaseClientOptions = {}
   const deleteEq = vi.fn(() => Promise.resolve(deleteResult));
   const del = vi.fn(() => ({ eq: deleteEq }));
 
-  const from = vi.fn(() => ({ select, insert, upsert, delete: del }));
+  // `.update(row).eq(...).eq(...).select()` — any number of chained
+  // `.eq()` calls, terminated by `.select()` resolving to `updateResult`.
+  // A real UPDATE with a WHERE clause matching zero rows still returns
+  // {data: [], error: null} in PostgREST, not an error — the version
+  // conflict this simulates is a routine outcome, not a failure.
+  const updateSelect = vi.fn(() => Promise.resolve(updateResult));
+  const updateBuilder = { eq: vi.fn(() => updateBuilder), select: updateSelect };
+  const update = vi.fn(() => updateBuilder);
+
+  const from = vi.fn(() => ({ select, insert, upsert, update, delete: del }));
 
   const getUser = vi.fn(() => Promise.resolve({ data: { user: options.user ?? null } }));
   const rpc = vi.fn(() => Promise.resolve(rpcResult));

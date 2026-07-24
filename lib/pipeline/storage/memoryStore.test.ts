@@ -11,16 +11,18 @@ function buildExecution(overrides: Partial<PipelineExecution> = {}): PipelineExe
     context: { startupIdea: "A subscription software platform for team scheduling" },
     stageHistory: [],
     progress: { completedStages: 0, percent: 0 },
+    version: 0,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };
 }
 
-// Milestone 78 — verifies this file's actual, current in-process Map-backed
-// behavior. This class is already relied upon (as a real implementation,
-// not a mock) by checkpointWriter.test.ts — these tests give it its own
-// direct coverage.
+// Milestone 78, extended at Milestone 107 with upsertWithVersionCheck
+// coverage — this class is already relied upon (as a real implementation,
+// not a mock) by checkpointWriter.test.ts and pipelineEngine.test.ts's
+// own race-condition suite, so its version semantics need direct,
+// dedicated coverage too, not just indirect exercise through those files.
 describe("MemoryPipelineStore", () => {
   let store: MemoryPipelineStore;
 
@@ -69,5 +71,44 @@ describe("MemoryPipelineStore", () => {
 
   it("does not throw when deleting an id that was never stored", async () => {
     await expect(store.delete("does_not_exist")).resolves.toBeUndefined();
+  });
+
+  describe("upsertWithVersionCheck", () => {
+    it("succeeds unconditionally for a brand-new id, persisting version + 1", async () => {
+      const result = await store.upsertWithVersionCheck(buildExecution({ version: 0 }), 0);
+
+      expect(result).toEqual({ success: true, version: 1 });
+      await expect(store.getById("pipeline_1")).resolves.toMatchObject({ version: 1 });
+    });
+
+    it("succeeds when expectedVersion matches the stored version, incrementing it", async () => {
+      await store.upsertWithVersionCheck(buildExecution({ version: 0 }), 0);
+
+      const result = await store.upsertWithVersionCheck(buildExecution({ state: "running", version: 1 }), 1);
+
+      expect(result).toEqual({ success: true, version: 2 });
+      await expect(store.getById("pipeline_1")).resolves.toMatchObject({ state: "running", version: 2 });
+    });
+
+    it("fails when expectedVersion is stale, returning the actual current record", async () => {
+      const first = await store.upsertWithVersionCheck(buildExecution({ version: 0 }), 0);
+      expect(first).toEqual({ success: true, version: 1 });
+
+      // A second writer still believes the version is 0 (the exact race
+      // Milestone 104C's Finding 1 identified).
+      const stale = await store.upsertWithVersionCheck(buildExecution({ state: "cancelling", version: 0 }), 0);
+
+      expect(stale.success).toBe(false);
+      if (!stale.success) {
+        expect(stale.current).toMatchObject({ state: "pending", version: 1 });
+      }
+    });
+
+    it("does not mutate the stored record when the version check fails", async () => {
+      await store.upsertWithVersionCheck(buildExecution({ version: 0 }), 0);
+      await store.upsertWithVersionCheck(buildExecution({ state: "failed", version: 0 }), 0);
+
+      await expect(store.getById("pipeline_1")).resolves.toMatchObject({ state: "pending", version: 1 });
+    });
   });
 });

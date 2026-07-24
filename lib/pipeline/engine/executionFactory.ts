@@ -15,6 +15,7 @@ export function buildInitialExecution(startupIdea: string, now: Date = new Date(
     context: { startupIdea },
     stageHistory: [],
     progress: computeProgress([]),
+    version: 0,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
   };

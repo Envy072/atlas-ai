@@ -7,7 +7,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 // data — a client built with the service-role key bypasses all of that
 // by design, so any other caller reaching for this file would silently
 // defeat every RLS policy in this project, not just the one it meant to
-// touch. Two legitimate callers exist today — each added deliberately,
+// touch. Three legitimate callers exist today — each added deliberately,
 // with the same justification, not by widening this comment casually:
 //
 // 1. lib/services/stripe.ts — Stripe's webhook has no user session (no
@@ -30,6 +30,16 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 //    specifically so this is the only path in, mirroring reason #1's
 //    same shape: a trusted server process, no user session to carry,
 //    application code is the true enforcement point.
+//
+// 3. lib/pipeline/storage/supabaseStore.ts (Milestone 107, Milestone
+//    104A ADR Decision 4) — pipeline_executions is read/written by the
+//    same anonymous-and-signed-in callers as analysis_sessions, for the
+//    identical reason as #2: no auth.uid() exists for an anonymous
+//    caller, so access control is enforced entirely by application code
+//    (the session id's unguessability plus sessionLifecycle.ts's ownerId
+//    check), never a Postgres user context. pipeline_executions' own
+//    migration enables RLS with zero policies for any role, same shape
+//    as #2.
 //
 // No other caller may reach for this file without the same rigor: name
 // the specific reason no user-session-bound client can do the job, not
