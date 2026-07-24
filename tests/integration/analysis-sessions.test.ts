@@ -6,15 +6,24 @@ import { createMockSupabaseClient } from "@/tests/mocks/supabaseClient";
 // cookies(), which has no request-scoped context under plain Vitest
 // execution and throws if actually invoked — confirmed directly by
 // running an unmocked probe before writing this file. Mocked here to
-// simulate the ordinary anonymous caller this route already supports;
-// the actual subject under test — the real, unmodified route handlers,
-// the real lib/analysis-session lifecycle, and the real (already
-// in-memory by default) session store — is untouched
-// (MILESTONE_30_DESIGN.md Architecture, "No mock needed for
-// lib/analysis-session's store").
+// simulate the ordinary anonymous caller this route already supports.
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
+
+// The default analysis-session store is real Supabase-backed as of
+// Milestone 106 (Milestone 104A ADR Decision 4) — no longer the
+// dependency-free in-memory default this file's own comment used to
+// rely on (MILESTONE_30_DESIGN.md Architecture, "No mock needed for
+// lib/analysis-session's store," now superseded). Swapped for a fresh
+// in-memory store for this file only, so the actual subject under
+// test — the real, unmodified route handlers and the real
+// lib/analysis-session lifecycle — stays real; only the durability
+// backend, which this file was never testing, is substituted.
+vi.mock("@/lib/analysis-session/storage/defaultStore", async () => {
+  const { MemoryAnalysisSessionStore } = await import("@/lib/analysis-session/storage/memoryStore");
+  return { defaultAnalysisSessionStore: new MemoryAnalysisSessionStore() };
+});
 
 // Milestone 44's monthly-limit check: getUserTier()/countProjectsThisMonth()'s
 // own internal correctness is already covered by their real unit tests

@@ -1,6 +1,6 @@
 import type { AnalysisSessionStore } from "@/lib/analysis-session/types/storage";
 import { MemoryAnalysisSessionStore } from "@/lib/analysis-session/storage/memoryStore";
-import { SupabaseAnalysisSessionStore } from "@/lib/analysis-session/storage/supabaseStore";
+import { createSupabaseAnalysisSessionStore } from "@/lib/analysis-session/storage/supabaseStore";
 
 // Milestone 50 — the raw-Postgres and Warehouse backends were both
 // always "ARCHITECTURE ONLY" (every method threw "not implemented
@@ -26,7 +26,7 @@ export function createStore(
     case "memory":
       return new MemoryAnalysisSessionStore();
     case "supabase":
-      return new SupabaseAnalysisSessionStore(options.supabaseTableName);
+      return createSupabaseAnalysisSessionStore(options.supabaseTableName);
     default: {
       const exhaustiveCheck: never = backend;
       throw new Error(`Unknown analysis session store backend: ${exhaustiveCheck}`);

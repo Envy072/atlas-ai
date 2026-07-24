@@ -11,6 +11,16 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
+// The default analysis-session store is real Supabase-backed as of
+// Milestone 106 — swapped for a fresh in-memory store for this file
+// only, so this file keeps validating analysisSessions.ts's own
+// orchestration against the real, unmocked lib/analysis-session
+// lifecycle, without depending on live Supabase credentials.
+vi.mock("@/lib/analysis-session/storage/defaultStore", async () => {
+  const { MemoryAnalysisSessionStore } = await import("@/lib/analysis-session/storage/memoryStore");
+  return { defaultAnalysisSessionStore: new MemoryAnalysisSessionStore() };
+});
+
 import { createClient } from "@/lib/supabase/server";
 import {
   startAnalysisSession,
