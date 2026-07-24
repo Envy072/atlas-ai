@@ -11,11 +11,12 @@ interface AppShellProps {
   user: ProfileMenuUser | null;
 }
 
-// The new dashboard shell: a persistent, collapsible sidebar (desktop) or
-// an overlay drawer (mobile) plus a header, wrapping whatever page content
-// is passed in. Applied today via app/dashboard/layout.tsx to /dashboard
-// and /dashboard/analysis only — see DASHBOARD.md for why the rest of the
-// app's routes aren't wrapped in this yet.
+// The dashboard shell: a persistent, collapsible sidebar (desktop) or an
+// overlay drawer (mobile) plus a header, wrapping whatever page content is
+// passed in. Applied via app/(app)/layout.tsx (Milestone 110) to every
+// sidebar destination — Dashboard, AI Analysis, Projects, Reports,
+// Competitors, Templates, Settings — so none of them can strand a visitor
+// without the shell.
 export default function AppShell({ children, user }: AppShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 

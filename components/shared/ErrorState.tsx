@@ -11,10 +11,11 @@ interface ErrorStateProps {
 
 // The shared "something broke" fallback for every route-level error.tsx
 // boundary (MILESTONE_29_DESIGN.md Deliverable 9) — the same card
-// rendered identically by app/error.tsx, app/dashboard/error.tsx, and
-// app/projects/error.tsx is exactly the "three repetitions" trigger
-// CLAUDE.md's Component Rules name for promoting a shared primitive,
-// not a premature abstraction for a pattern that might not repeat.
+// rendered identically by app/error.tsx, app/(app)/dashboard/error.tsx,
+// and app/(app)/projects/error.tsx is exactly the "three repetitions"
+// trigger CLAUDE.md's Component Rules name for promoting a shared
+// primitive, not a premature abstraction for a pattern that might not
+// repeat.
 // Composes EmptyState (already this app's standard "nothing here"
 // visual language) rather than inventing a second one.
 export default function ErrorState({
