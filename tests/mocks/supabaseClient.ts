@@ -22,6 +22,10 @@ export interface MockSupabaseClientOptions {
   countResult?: { count: number | null; error: MockSupabaseError | null };
   /** What `.rpc()` resolves to (Milestone 47 — lib/services/rateLimit's own Postgres functions). */
   rpcResult?: MockSupabaseResult<unknown>;
+  /** What the terminal `.upsert()` call resolves to (Milestone 105 — lib/persistence's own generic adapter). */
+  upsertResult?: { error: MockSupabaseError | null };
+  /** What the terminal `.delete().eq()` call resolves to (Milestone 105). */
+  deleteResult?: { error: MockSupabaseError | null };
 }
 
 // A small, hand-rolled mock implementing only the exact Supabase
@@ -50,6 +54,8 @@ export function createMockSupabaseClient(options: MockSupabaseClientOptions = {}
   const insertResult = options.insertResult ?? { error: null };
   const countResult = options.countResult ?? { count: 0, error: null };
   const rpcResult = options.rpcResult ?? { data: null, error: null };
+  const upsertResult = options.upsertResult ?? { error: null };
+  const deleteResult = options.deleteResult ?? { error: null };
 
   const eq = vi.fn(() => queryBuilder);
   const order = vi.fn(() => Promise.resolve(selectResult));
@@ -60,8 +66,16 @@ export function createMockSupabaseClient(options: MockSupabaseClientOptions = {}
 
   const select = vi.fn(() => queryBuilder);
   const insert = vi.fn(() => Promise.resolve(insertResult));
+  const upsert = vi.fn(() => Promise.resolve(upsertResult));
+  // A separate, minimal builder from queryBuilder above: this codebase's
+  // only delete call shape is `.delete().eq(...)` awaited directly, with
+  // no further chaining (unlike a select chain, which may continue to
+  // .maybeSingle()/.order()) — so it doesn't need to share queryBuilder's
+  // richer shape.
+  const deleteEq = vi.fn(() => Promise.resolve(deleteResult));
+  const del = vi.fn(() => ({ eq: deleteEq }));
 
-  const from = vi.fn(() => ({ select, insert }));
+  const from = vi.fn(() => ({ select, insert, upsert, delete: del }));
 
   const getUser = vi.fn(() => Promise.resolve({ data: { user: options.user ?? null } }));
   const rpc = vi.fn(() => Promise.resolve(rpcResult));
