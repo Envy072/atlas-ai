@@ -94,6 +94,13 @@ async function writeCheckpointYieldingToCancellation(
       const reconciled = { ...execution, state: current.state, version: current.version };
       return writeCheckpoint(store, transitionTo(reconciled, "cancelled", new Date()));
     }
+    // Milestone 108: a concurrent caller already achieved the exact
+    // transition this call wanted (e.g. two staleness-triggered recovery
+    // attempts both racing to mark the same stuck execution "running"
+    // again) — not a conflict to escalate, since the goal this call
+    // wanted is already true. This is what makes duplicate recovery
+    // attempts suppress cleanly rather than error.
+    if (current.state === execution.state) return current;
 
     throw error;
   }
@@ -495,6 +502,63 @@ export async function getExecution(
   store: PipelineExecutionStore = defaultStore
 ): Promise<PipelineExecution | null> {
   return store.getById(executionId);
+}
+
+// Milestone 108 — a generous, deliberately conservative threshold:
+// several times larger than any single stage (or the whole six-stage
+// pipeline) has been observed to take in this environment (real runs
+// ranged roughly 15-85s end to end), so a genuinely still-progressing
+// execution is never mistaken for abandoned. Read-time only — no
+// background job or scheduler exists in this codebase, and none is
+// introduced here (Milestone 104A ADR's own "defer a background reaper
+// until scheduled infrastructure exists for other reasons" decision).
+export const STALE_EXECUTION_THRESHOLD_MS = 120_000;
+
+// `pending`/`running`/`cancelling` are eligible. `pending`/`running`
+// are exactly the two states resumePipeline() itself already knows how
+// to act on (it already returns retry_pending/stage_failed/terminal
+// states as-is, unchanged by this milestone). `cancelling` is a real,
+// distinct gap discovered during this milestone's own manual validation
+// (not a pre-existing bug): resumePipeline()'s own pre-existing
+// behavior deliberately returns a "cancelling" checkpoint as-is,
+// trusting that whatever process is already running will notice and
+// finalize it at its next stage boundary — an assumption that breaks
+// exactly when that process is the one that disappeared (a cancellation
+// requested against an execution whose driver has already died, or a
+// recovery attempt that itself loses a race to a concurrent cancel,
+// leaves nothing left to ever finalize it). finalizeStaleCancellation()
+// below closes this without touching resumePipeline()'s own restriction.
+// A process crashing mid-backoff-sleep (state: retry_pending) has the
+// same class of problem but is explicitly left out of this milestone's
+// scope — closing it would mean changing resumePipeline()'s own
+// restriction for a state this design deliberately doesn't touch.
+export function isExecutionStale(execution: PipelineExecution, now: Date = new Date()): boolean {
+  if (execution.state !== "pending" && execution.state !== "running" && execution.state !== "cancelling") {
+    return false;
+  }
+  const ageMs = now.getTime() - Date.parse(execution.updatedAt);
+  return ageMs > STALE_EXECUTION_THRESHOLD_MS;
+}
+
+// Finalizes an execution stuck at "cancelling" with no live process left
+// to observe it — completing the exact transition cancelPipeline()
+// already intended, via the same transitionTo/writeCheckpoint machinery
+// every other transition in this file uses. Never invoked for
+// pending/running (resumePipeline() already owns those); only meaningful
+// once isExecutionStale() has already confirmed this specific execution
+// is stuck.
+export async function finalizeStaleCancellation(
+  executionId: string,
+  store: PipelineExecutionStore = defaultStore
+): Promise<PipelineExecution> {
+  const checkpoint = await store.getById(executionId);
+  if (!checkpoint) {
+    throw new InvalidRequestError(`No pipeline execution found for id "${executionId}".`);
+  }
+  if (checkpoint.state !== "cancelling") return checkpoint;
+
+  const cancelled = transitionTo(checkpoint, "cancelled", new Date());
+  return writeCheckpointYieldingToCancellation(store, cancelled);
 }
 
 export { subscribeToExecution };

@@ -1,4 +1,12 @@
-import { startPipeline, resumePipeline, retryStage, cancelPipeline, getExecution } from "@/lib/pipeline";
+import {
+  startPipeline,
+  resumePipeline,
+  retryStage,
+  cancelPipeline,
+  getExecution,
+  isExecutionStale,
+  finalizeStaleCancellation,
+} from "@/lib/pipeline";
 import { InvalidRequestError } from "@/lib/errors";
 import { parseOrThrow } from "@/lib/validation/parse";
 import type {
@@ -75,6 +83,20 @@ export async function createSession(
 // different user returns null for the identical reason (see
 // assertAccessible above) — the route layer already treats a null
 // result as "not found" with no change needed there.
+// Milestone 108 — every poll passes through here, making this the one
+// natural choke-point to detect and recover a stuck execution: before
+// this milestone, resumePipeline() existed and was fully correct but was
+// never called from any live code path, so a "running" execution whose
+// process disappeared stayed stuck forever, no matter how long a client
+// kept polling. Recovery is gated entirely by isExecutionStale() — a
+// genuinely still-progressing execution is never touched, only one
+// whose updatedAt is old enough that its process almost certainly no
+// longer exists. A stale "cancelling" execution (discovered during this
+// milestone's own manual validation — see finalizeStaleCancellation()'s
+// own comment) is finalized directly rather than resumed, since there's
+// no stage left to run, only an already-intended transition to
+// complete. resumePipeline() itself is unchanged; this only decides
+// *when* to call it.
 export async function getSession(
   sessionId: string,
   requestingUserId: string | null,
@@ -84,8 +106,18 @@ export async function getSession(
   if (!record) return null;
   if (record.ownerId !== null && record.ownerId !== requestingUserId) return null;
 
-  const execution = await getExecution(record.executionId);
+  let execution = await getExecution(record.executionId);
   if (!execution) return null;
+
+  if (isExecutionStale(execution)) {
+    console.log(
+      `[pipeline recovery] execution "${execution.id}" stale (state: "${execution.state}", last updated ${execution.updatedAt}) — attempting recovery.`
+    );
+    execution =
+      execution.state === "cancelling"
+        ? await finalizeStaleCancellation(record.executionId)
+        : await resumePipeline(record.executionId);
+  }
 
   return composeAnalysisSession(record, execution);
 }

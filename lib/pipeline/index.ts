@@ -9,6 +9,9 @@ export {
   cancelPipeline,
   getExecution,
   subscribeToExecution,
+  isExecutionStale,
+  finalizeStaleCancellation,
+  STALE_EXECUTION_THRESHOLD_MS,
 } from "@/lib/pipeline/engine/pipelineEngine";
 
 export { canTransition, isTerminalState, assertTransition } from "@/lib/pipeline/state/stateMachine";
