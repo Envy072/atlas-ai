@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { Activity, Sparkles } from "lucide-react";
 import type { Project } from "@/lib/schemas/project";
-import { formatRelativeTime } from "@/lib/format";
 import IconBadge from "@/components/shared/IconBadge";
+import RelativeTime from "@/components/shared/RelativeTime";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import EmptyState from "@/components/shared/EmptyState";
@@ -54,7 +54,9 @@ export default function RecentActivityPanel({ projects }: RecentActivityPanelPro
                 <p className="truncate text-sm text-card-foreground">
                   Analysis completed for <span className="font-semibold">{project.title}</span>
                 </p>
-                <p className="text-xs text-muted-foreground">{formatRelativeTime(project.createdAt)}</p>
+                <p className="text-xs text-muted-foreground">
+                  <RelativeTime isoDate={project.createdAt} />
+                </p>
               </div>
             </div>
           ))

@@ -4,9 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { FolderClock, FileSearch } from "lucide-react";
 import type { Project } from "@/lib/schemas/project";
-import { formatRelativeTime, formatPercent } from "@/lib/format";
+import { formatPercent } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import EmptyState from "@/components/shared/EmptyState";
+import RelativeTime from "@/components/shared/RelativeTime";
 
 interface ReportHistoryPanelProps {
   projects: Project[];
@@ -64,7 +65,7 @@ export default function ReportHistoryPanel({ projects }: ReportHistoryPanelProps
                   >
                     <p className="truncate text-sm font-medium text-card-foreground">{project.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatRelativeTime(project.createdAt)} •{" "}
+                      <RelativeTime isoDate={project.createdAt} /> •{" "}
                       {formatPercent(Math.round(project.profile.confidenceSummary.evidenceConfidence))} confidence
                     </p>
                   </button>
