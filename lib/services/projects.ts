@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { ProjectSchema } from "@/lib/schemas/project";
 import type { Project } from "@/lib/schemas/project";
 import type { AnalysisSessionView } from "@/lib/schemas/analysisSessionView";
+import { buildDecisionArtifacts } from "@/lib/decision";
+import type { DecisionArtifacts } from "@/lib/decision";
 
 // Uses the cookie-aware server client (lib/supabase/server.ts) —
 // required for RLS (MILESTONE_27_DESIGN.md / Milestone 27c). auth.uid(),
@@ -30,6 +32,7 @@ interface ProjectRow {
   owner_id: string | null;
   profile: unknown;
   verification: unknown;
+  decision_artifacts: unknown;
 }
 
 function fromRow(row: ProjectRow): Project | null {
@@ -42,6 +45,7 @@ function fromRow(row: ProjectRow): Project | null {
     ownerId: row.owner_id,
     profile: row.profile,
     verification: row.verification,
+    decisionArtifacts: row.decision_artifacts,
   });
 
   if (!result.success) {
@@ -150,7 +154,8 @@ export async function countProjectsThisMonth(userId: string, now: Date): Promise
 // (MILESTONE_26_DESIGN.md Section 3.5). Called from
 // lib/services/analysisSessions.ts's session-view composition — the
 // sole caller — whenever a session view is observed, whether that's the
-// moment it first completes or any later reopening of the same session.
+// moment it first completes or any later reopening of the same session
+// (in practice: every poll while non-terminal, plus any later revisit).
 //
 // A no-op unless the session actually finished (mirrors AIWorkspace's
 // own completion gate: state === "completed" with both a result and a
@@ -159,6 +164,19 @@ export async function countProjectsThisMonth(userId: string, now: Date): Promise
 // requires authentication" (the approved product decision) means
 // exactly this: an anonymous completion is never persisted at all, not
 // persisted with a null owner the way it was before this milestone.
+//
+// Milestone 115 — a cheap existence check by session_id runs first,
+// purely as a fast path: this function is called on every poll of an
+// already-completed session, and without this check, every one of
+// those calls would recompute buildDecisionArtifacts() (two live OpenAI
+// calls) only to immediately discard the result to a unique-violation.
+// This check is NOT the correctness mechanism — the unique index on
+// session_id still is, unchanged, and still the only thing that can
+// safely reject a genuine race (two concurrent first-observations of
+// the same newly-completed session both racing past this check). A
+// race that gets past this check simply computes buildDecisionArtifacts()
+// twice and discards whichever insert loses to the unique violation —
+// wasted work, never a conflicting or partially-written snapshot.
 //
 // IMMUTABILITY (MILESTONE_26_DESIGN.md Section 3.2/4, a binding
 // requirement, not a preference): this function only ever calls
@@ -181,6 +199,42 @@ export async function persistProjectFromSession(
     return;
   }
 
+  const supabase = await createClient();
+
+  const { data: existing, error: existsError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("session_id", session.id)
+    .maybeSingle();
+
+  if (existsError) {
+    console.error("Supabase Error:", existsError);
+    return;
+  }
+
+  if (existing) {
+    // Already persisted — the common case for every poll after the
+    // first. No artifact computation, no OpenAI call, no write.
+    return;
+  }
+
+  // Computed exactly once, here, at the moment this session is first
+  // observed as completed and not yet persisted — never recomputed by
+  // a route on render (Milestone 115, closing Milestone 114's Critical
+  // Finding #2). buildDecisionArtifacts() itself already degrades
+  // internally to `{ recommendations: [], verdict: undefined }` on a
+  // generation failure; the try/catch here is one more defensive layer
+  // matching this function's own "must never throw" contract, so an
+  // unexpected throw here still lets the project's profile/verification
+  // persist rather than losing the whole snapshot.
+  let decisionArtifacts: DecisionArtifacts;
+  try {
+    decisionArtifacts = await buildDecisionArtifacts(session.result.profile);
+  } catch (error) {
+    console.error("Decision artifact generation failed:", error);
+    decisionArtifacts = { recommendations: [], verdict: undefined };
+  }
+
   // safeParse, not parseOrThrow: this whole function must never throw
   // (it runs as a side effect of the read-only session-polling path) —
   // a malformed construction is logged and swallowed exactly like any
@@ -195,6 +249,7 @@ export async function persistProjectFromSession(
     ownerId: userId,
     profile: session.result.profile,
     verification,
+    decisionArtifacts,
   });
 
   if (!result.success) {
@@ -213,16 +268,19 @@ export async function persistProjectFromSession(
     owner_id: project.ownerId,
     profile: project.profile,
     verification: project.verification,
+    decision_artifacts: project.decisionArtifacts,
   };
 
-  const supabase = await createClient();
   const { error } = await supabase.from("projects").insert(row);
 
   if (error) {
     if (error.code === "23505") {
       // Unique violation on session_id — a snapshot already exists for
-      // this session. Expected under concurrent polling/reopening, not
-      // a failure (Section 3.2).
+      // this session (the concurrent-race case the fast-path check
+      // above doesn't fully close). This call's own freshly-computed
+      // decisionArtifacts is discarded along with the rest of its row;
+      // whichever concurrent call won the insert is the only one ever
+      // read back, so no conflicting snapshot is ever observable.
       return;
     }
     console.error("Supabase Error:", error);

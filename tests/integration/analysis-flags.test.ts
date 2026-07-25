@@ -59,6 +59,7 @@ function toProjectRow(project: ReturnType<typeof buildProjectFixture>) {
     owner_id: project.ownerId,
     profile: project.profile,
     verification: project.verification,
+    decision_artifacts: project.decisionArtifacts,
   };
 }
 

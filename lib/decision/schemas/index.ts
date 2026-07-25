@@ -18,3 +18,4 @@ export * from "@/lib/decision/schemas/candidateThesisArgument.schema";
 export * from "@/lib/decision/schemas/candidateRecommendation.schema";
 export * from "@/lib/decision/schemas/verdict.schema";
 export * from "@/lib/decision/schemas/candidateVerdict.schema";
+export * from "@/lib/decision/schemas/artifacts.schema";

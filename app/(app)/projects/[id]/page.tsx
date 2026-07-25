@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/services/auth";
 import { getProjectById } from "@/lib/services/projects";
-import { buildDecisionArtifacts, isDecisionStale } from "@/lib/decision";
+import { isDecisionStale } from "@/lib/decision";
 import { formatRelativeTime } from "@/lib/format";
 import { H1, Small } from "@/components/ui/typography";
 import DecisionReport from "@/components/workspace/decision-report/DecisionReport";
@@ -24,11 +24,16 @@ interface ProjectDetailPageProps {
 //
 // Reuses DecisionReport: a Project's profile/verification fields are
 // exactly the already-validated shapes that component was built to
-// render for the live analysis flow. As of Milestone 38, this route
-// also calls buildDecisionArtifacts(project.profile) — the one shared
-// computation point for Decision Intelligence's recommendations and
-// verdict (lib/decision/artifacts/decisionArtifacts.ts) — and passes
-// the resulting verdict through to DecisionReport/DecisionSummaryPanel.
+// render for the live analysis flow. As of Milestone 115, this route
+// reads project.decisionArtifacts — computed exactly once, at the
+// moment this project was first persisted (persistProjectFromSession(),
+// lib/services/projects.ts) — rather than calling
+// buildDecisionArtifacts(project.profile) itself: two live OpenAI calls
+// per page render made this route's own verdict visibly disagree with
+// /projects/{id}/memo's (Milestone 114's Critical Finding #2). A null
+// decisionArtifacts (a project persisted before this migration) reads
+// as "no verdict yet," the same honest-empty state already used when
+// there's genuinely nothing to assemble a verdict from.
 //
 // getProjectById treats "doesn't exist," "malformed," and "belongs to
 // someone else" identically (a null return) — notFound() fires for all
@@ -61,7 +66,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
     notFound();
   }
 
-  const { verdict } = await buildDecisionArtifacts(project.profile);
+  const verdict = project.decisionArtifacts?.verdict;
   const now = new Date();
   const isStale = isDecisionStale(project.profile, now);
 

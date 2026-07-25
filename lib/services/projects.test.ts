@@ -12,10 +12,22 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
+// Milestone 115 — persistProjectFromSession() now calls
+// buildDecisionArtifacts(), which makes real OpenAI calls
+// (deriveRecommendations()/deriveVerdict()). Mocked at its exact leaf
+// module, the same pattern decisionArtifacts.test.ts itself uses for
+// its own two dependencies — this suite is about persistence, not
+// generation, and must never let a unit test reach the network.
+vi.mock("@/lib/decision/artifacts/decisionArtifacts", () => ({
+  buildDecisionArtifacts: vi.fn(),
+}));
+
 import { createClient } from "@/lib/supabase/server";
+import { buildDecisionArtifacts } from "@/lib/decision/artifacts/decisionArtifacts";
 import { listProjects, getProjectById, persistProjectFromSession, countProjectsThisMonth } from "@/lib/services/projects";
 
 const mockedCreateClient = vi.mocked(createClient);
+const mockedBuildDecisionArtifacts = vi.mocked(buildDecisionArtifacts);
 
 function buildValidRow(overrides: Record<string, unknown> = {}) {
   const profile = buildDecisionProfileFixture();
@@ -30,6 +42,7 @@ function buildValidRow(overrides: Record<string, unknown> = {}) {
     owner_id: "user-1",
     profile,
     verification,
+    decision_artifacts: null,
     ...overrides,
   };
 }
@@ -61,6 +74,8 @@ function buildCompletedSessionView(overrides: Partial<AnalysisSession> = {}): An
 
 beforeEach(() => {
   mockedCreateClient.mockReset();
+  mockedBuildDecisionArtifacts.mockReset();
+  mockedBuildDecisionArtifacts.mockResolvedValue({ recommendations: [], verdict: undefined });
 });
 
 describe("listProjects", () => {
@@ -93,6 +108,7 @@ describe("listProjects", () => {
         ownerId: row.owner_id,
         profile: row.profile,
         verification: row.verification,
+        decisionArtifacts: row.decision_artifacts,
       },
     ]);
   });
@@ -199,6 +215,7 @@ describe("getProjectById", () => {
       ownerId: row.owner_id,
       profile: row.profile,
       verification: row.verification,
+      decisionArtifacts: row.decision_artifacts,
     });
   });
 });
@@ -292,6 +309,136 @@ describe("persistProjectFromSession", () => {
         verification: view.verification,
       })
     );
+  });
+
+  // Milestone 115 — closes Milestone 114's Critical Finding #2 (a
+  // project's verdict visibly disagreeing with itself between
+  // /projects/{id} and /projects/{id}/memo, since each route made its
+  // own live, non-deterministic OpenAI call on every render). These
+  // tests prove the property at the one seam where it's actually
+  // decided: persistProjectFromSession() computes decision artifacts at
+  // most once per session and persists them; every route now just
+  // reads project.decisionArtifacts, a plain field access with zero
+  // further I/O — not independently unit-testable here, since Server
+  // Component route rendering isn't reachable by this project's current
+  // test tooling (MILESTONE_31_DESIGN.md's own, already-accepted
+  // limitation), but nothing downstream of a persisted, immutable field
+  // can disagree with itself.
+  it("queries by session_id before computing anything — the fast-path existence check", async () => {
+    const client = createMockSupabaseClient({ selectResult: { data: null, error: null } });
+    mockedCreateClient.mockResolvedValue(client);
+    const view = buildCompletedSessionView();
+
+    await persistProjectFromSession(view, "user-1");
+
+    const fromReturn = vi.mocked(client.from).mock.results[0]?.value;
+    const selectReturn = vi.mocked(fromReturn.select).mock.results[0]?.value;
+    expect(selectReturn.eq).toHaveBeenCalledWith("session_id", view.session.id);
+  });
+
+  it("computes decision artifacts exactly once and includes them in the inserted row, for a genuinely new session", async () => {
+    const client = createMockSupabaseClient({ selectResult: { data: null, error: null }, insertResult: { error: null } });
+    mockedCreateClient.mockResolvedValue(client);
+    const artifacts = { recommendations: [], verdict: undefined };
+    mockedBuildDecisionArtifacts.mockResolvedValue(artifacts);
+    const view = buildCompletedSessionView();
+
+    await persistProjectFromSession(view, "user-1");
+
+    expect(mockedBuildDecisionArtifacts).toHaveBeenCalledTimes(1);
+    expect(mockedBuildDecisionArtifacts).toHaveBeenCalledWith(view.session.result?.profile);
+    const fromReturn = vi.mocked(client.from).mock.results[0]?.value;
+    expect(fromReturn.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ decision_artifacts: artifacts })
+    );
+  });
+
+  it("never computes decision artifacts, and never inserts, when a project already exists for this session", async () => {
+    mockedCreateClient.mockResolvedValue(
+      createMockSupabaseClient({ selectResult: { data: { id: "existing-project" }, error: null } })
+    );
+
+    await persistProjectFromSession(buildCompletedSessionView(), "user-1");
+
+    expect(mockedBuildDecisionArtifacts).not.toHaveBeenCalled();
+  });
+
+  it("makes no further OpenAI call on a second observation of the same already-persisted session — the repeated-poll case", async () => {
+    // First poll: nothing persisted yet.
+    mockedCreateClient.mockResolvedValueOnce(
+      createMockSupabaseClient({ selectResult: { data: null, error: null }, insertResult: { error: null } })
+    );
+    const view = buildCompletedSessionView();
+    await persistProjectFromSession(view, "user-1");
+    expect(mockedBuildDecisionArtifacts).toHaveBeenCalledTimes(1);
+
+    // Second poll of the same, now-persisted session: the fast-path
+    // existence check finds it and returns immediately.
+    mockedCreateClient.mockResolvedValueOnce(
+      createMockSupabaseClient({ selectResult: { data: { id: "project-1" }, error: null } })
+    );
+    await persistProjectFromSession(view, "user-1");
+
+    expect(mockedBuildDecisionArtifacts).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to an honest empty artifacts value, and still persists the project, when decision-artifact generation throws unexpectedly", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const client = createMockSupabaseClient({ selectResult: { data: null, error: null }, insertResult: { error: null } });
+    mockedCreateClient.mockResolvedValue(client);
+    mockedBuildDecisionArtifacts.mockRejectedValue(new Error("OpenAI is unreachable"));
+    const view = buildCompletedSessionView();
+
+    await persistProjectFromSession(view, "user-1");
+
+    const fromReturn = vi.mocked(client.from).mock.results[0]?.value;
+    expect(fromReturn.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ decision_artifacts: { recommendations: [], verdict: undefined } })
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("a concurrent race — two calls that both observe 'not yet persisted' — computes artifacts independently, and the losing insert's own (possibly different) computation is discarded, never persisted", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const view = buildCompletedSessionView();
+
+    // Call A: racing ahead of any persisted row, computes its own verdict.
+    mockedCreateClient.mockResolvedValueOnce(
+      createMockSupabaseClient({ selectResult: { data: null, error: null }, insertResult: { error: null } })
+    );
+    mockedBuildDecisionArtifacts.mockResolvedValueOnce({
+      recommendations: [],
+      verdict: { category: "pursue", summary: "Call A's verdict.", confidence: 80, supportingEvidence: [] },
+    });
+    await persistProjectFromSession(view, "user-1");
+
+    // Call B: raced past the same "not found" check before A's insert
+    // committed, computes a genuinely different verdict — then loses
+    // the actual database race, exactly as the unique index on
+    // session_id (supabase/migrations/20260713203553_project_persistence.sql)
+    // guarantees for any real concurrent pair.
+    mockedCreateClient.mockResolvedValueOnce(
+      createMockSupabaseClient({
+        selectResult: { data: null, error: null },
+        insertResult: { error: { code: "23505", message: "duplicate" } },
+      })
+    );
+    mockedBuildDecisionArtifacts.mockResolvedValueOnce({
+      recommendations: [],
+      verdict: { category: "pass", summary: "Call B's different verdict.", confidence: 40, supportingEvidence: [] },
+    });
+    await persistProjectFromSession(view, "user-1");
+
+    expect(mockedBuildDecisionArtifacts).toHaveBeenCalledTimes(2);
+    // B's own insert attempt genuinely happened (with its own, different
+    // verdict) but never succeeded — no update path exists anywhere in
+    // this file to let it overwrite A's already-committed row, and the
+    // 23505 branch returns without logging it as a failure: B's verdict
+    // is discarded, not persisted, not observable by any later reader.
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
   });
 
   it("treats a 23505 unique-violation as a silent success, not a logged failure", async () => {

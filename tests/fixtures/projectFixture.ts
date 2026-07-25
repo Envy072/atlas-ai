@@ -35,6 +35,7 @@ export function buildProjectFixture(options: BuildProjectFixtureOptions = {}): P
     ownerId: "fixture-owner-id",
     profile,
     verification,
+    decisionArtifacts: null,
   };
 
   return parseOrThrow(
