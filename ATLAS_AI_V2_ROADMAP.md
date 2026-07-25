@@ -715,7 +715,26 @@ smaller Milestone count.
   deferred, unscoped, real future work, not touched here.
 - Dependencies: Phase 5 and Milestone 49 both complete (Section 12's
   own gate).
-- Delivered: commit (pending).
+- Delivered: commit `e91fb67`.
+
+**Milestone 51 — Shared Dedup/URL-Normalization Utilities**
+- *(Not part of any of the five phases above — the second of Section
+  12's own "deliberately waits" technical-debt items. Formally added
+  here; this entry was missing when the milestone actually shipped —
+  a gap this document's own Milestone 52 planning pass caught and
+  corrected.)*
+- Mission: consolidate `dedupeByKey<T>()` (4 byte-identical copies:
+  `financial`, `business`, `decision`, `market`) and `urlDedupeKey()`
+  (5 byte-identical copies: those same 4 plus `competitors`) into one
+  new `lib/shared/` module, verified byte-for-byte identical before
+  any file was touched.
+- **Outside scope**: label-normalization duplication
+  (`normalizeLabel`/`normalizeIndustryName`/`normalizeCompanyName`)
+  and `computeDiscoveryConfidence()`'s repeated averaging policy —
+  both real, both confirmed during this milestone's own investigation,
+  both left for a separately-scoped future milestone.
+- Dependencies: Milestone 50 (Phase 5 + Milestone 49 complete).
+- Delivered: commit `7b965d2`.
 
 ---
 
@@ -831,10 +850,19 @@ Direct answers to the specific operational questions:
 **Deliberately waited until after Version 2 shipped in full — now unblocked**:
 - ✅ Storage consolidation (Memory + Supabase only, retiring raw
   Postgres and the speculative Warehouse variant) — **done, Milestone 50**.
-- Paying down the `dedupeByKey`/`urlNormalization` debt (five copies) —
-  still deferred, unscoped, real future work.
+- ✅ Paying down the `dedupeByKey`/`urlNormalization` debt (five copies)
+  — **done, Milestone 51**.
 - Extending the Milestone 30 test pattern to the other five knowledge
-  platforms — still deferred, unscoped, real future work.
+  platforms — still deferred, unscoped, real future work. *(Clarified
+  during Milestone 52 planning: "the six knowledge platforms" this
+  phrase refers to is `MILESTONE_30_DESIGN.md`'s own definition —
+  `business`, `competitors`, `decision`, `financial`, `market`,
+  `pipeline` — not `ATLAS_AI_PHASE_3_REVIEW.md`'s differently-scoped
+  seven-name list. `decision` has since organically accumulated 13
+  test files via its own Phase 2 milestones, each shipping with its
+  own tests — not via this item — leaving exactly five untouched:
+  `business`, `competitors`, `financial`, `market`, `pipeline`, all at
+  zero test files today.)*
 
 **Architecture investments**: nothing new required — the existing six
 platforms suffice (settled in `ATLAS_AI_V2_FINAL.md`, Section 20, not
