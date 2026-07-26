@@ -8,6 +8,8 @@ import {
   formatRelativeTime,
   getBusinessSummaryHeadline,
   getProjectSummaryFields,
+  isPasswordRecoveryLinkError,
+  getPasswordResetValidationError,
 } from "@/lib/format";
 
 describe("formatScore", () => {
@@ -250,5 +252,54 @@ describe("formatRelativeTime", () => {
     vi.setSystemTime(NOW);
     const past = new Date(NOW.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
     expect(formatRelativeTime(past)).toBe("3 days ago");
+  });
+});
+
+// Milestone 120 — closes Private Beta Readiness Review High Finding H2
+// (no self-service account recovery). Detects Supabase's own recovery-
+// link failure signal (an expired or already-used link) without ever
+// parsing or trusting a token itself — just the presence of an `error`
+// param Supabase's own redirect already attached, in either the query
+// string (PKCE) or the hash fragment (implicit), since this app can't
+// know from the repo alone which flow this project's Auth settings use.
+describe("isPasswordRecoveryLinkError", () => {
+  it("detects an error in the hash fragment (implicit flow)", () => {
+    expect(
+      isPasswordRecoveryLinkError("#error=access_denied&error_code=otp_expired", new URLSearchParams())
+    ).toBe(true);
+  });
+
+  it("detects an error in the query string (PKCE flow)", () => {
+    expect(isPasswordRecoveryLinkError("", new URLSearchParams("error=access_denied"))).toBe(true);
+  });
+
+  it("returns false for a valid link with no error in either location", () => {
+    expect(isPasswordRecoveryLinkError("#access_token=abc&type=recovery", new URLSearchParams())).toBe(false);
+  });
+
+  it("returns false for a bare visit with no hash or query params at all", () => {
+    expect(isPasswordRecoveryLinkError("", new URLSearchParams())).toBe(false);
+  });
+
+  it("handles a hash fragment without a leading '#' the same as one with it", () => {
+    expect(isPasswordRecoveryLinkError("error=access_denied", new URLSearchParams())).toBe(true);
+  });
+});
+
+describe("getPasswordResetValidationError", () => {
+  it("rejects a password shorter than 6 characters", () => {
+    expect(getPasswordResetValidationError("abc12", "abc12")).toBe("Password must be at least 6 characters.");
+  });
+
+  it("rejects a password that doesn't match its confirmation", () => {
+    expect(getPasswordResetValidationError("longenough1", "longenough2")).toBe("Passwords do not match.");
+  });
+
+  it("accepts a long-enough, matching password pair", () => {
+    expect(getPasswordResetValidationError("longenough1", "longenough1")).toBeNull();
+  });
+
+  it("checks length before match, so a too-short pair gets the length message even if they match", () => {
+    expect(getPasswordResetValidationError("abc", "abc")).toBe("Password must be at least 6 characters.");
   });
 });

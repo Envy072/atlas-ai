@@ -43,6 +43,34 @@ export function getSafeRedirectPath(path: string | null, fallback: string): stri
   return isSafe ? path : fallback;
 }
 
+// Milestone 120 — Supabase's own password-recovery redirect surfaces a
+// failure (an expired or already-used link) as an `error`/`error_code`
+// param, in either the URL's query string (PKCE flow) or its hash
+// fragment (implicit flow) depending on this project's own Auth
+// settings — never reliably just one, so /reset-password checks both
+// rather than assuming a specific flow. This never parses or trusts a
+// token itself (no custom token implementation, per this milestone's
+// own design constraint): it only detects whether Supabase's own
+// redirect already flagged a failure, so the page can show one honest,
+// friendly message instead of a broken form or Supabase's own raw
+// error text verbatim.
+export function isPasswordRecoveryLinkError(hash: string, searchParams: URLSearchParams): boolean {
+  const hashParams = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
+  return Boolean(hashParams.get("error") ?? searchParams.get("error"));
+}
+
+// A new password must be long enough (mirrors /signup's own
+// minLength={6}, Supabase Auth's own default minimum) and must match
+// its confirmation — the one piece of validation genuinely local to
+// this app rather than already enforced by Supabase Auth itself, so
+// it's the one piece worth a real, testable function rather than
+// living inline in /reset-password's own submit handler.
+export function getPasswordResetValidationError(password: string, confirmPassword: string): string | null {
+  if (password.length < 6) return "Password must be at least 6 characters.";
+  if (password !== confirmPassword) return "Passwords do not match.";
+  return null;
+}
+
 export function formatPercent(value: number): string {
   return `${value}%`;
 }

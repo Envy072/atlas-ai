@@ -107,6 +107,15 @@ function LoginForm() {
           </div>
         ) : (
           <form onSubmit={handleSignIn} className="space-y-4">
+            {/* Milestone 120 — set by /reset-password after a successful
+                password update, once the recovery session itself has
+                already been signed out (that page's own comment). */}
+            {searchParams.get("resetSuccess") === "1" && (
+              <Alert variant="success">
+                <AlertDescription>Your password has been updated. Sign in with your new password.</AlertDescription>
+              </Alert>
+            )}
+
             <Input
               type="email"
               placeholder="Email"
@@ -133,6 +142,12 @@ function LoginForm() {
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? "Signing in..." : "Sign in"}
             </Button>
+
+            <p className="text-center text-sm text-muted-foreground">
+              <Link href="/forgot-password" className="text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </p>
           </form>
         )}
 
