@@ -5,6 +5,7 @@ import type { Source } from "@/lib/research/schemas/source.schema";
 import { SourceSchema } from "@/lib/research/schemas/source.schema";
 import { fetchWithRetry, RequestTimeoutError } from "@/lib/research/utils/httpRequest";
 import { extractDomain } from "@/lib/research/utils/normalization";
+import { sanitizeSnippet } from "@/lib/research/utils/textSanitization";
 
 const CRUNCHBASE_ENDPOINT = "https://api.crunchbase.com/v4/data/searches/organizations";
 const CRUNCHBASE_ORG_BASE_URL = "https://www.crunchbase.com/organization";
@@ -91,7 +92,7 @@ function normalizeResults(entities: CrunchbaseEntity[], retrievedAt: string): So
       title,
       url,
       domain: extractDomain(url),
-      snippet: properties?.short_description,
+      snippet: sanitizeSnippet(properties?.short_description),
       publishedAt: properties?.founded_on?.value,
       retrievedAt,
       confidence: positionBasedConfidence(index),

@@ -51,6 +51,35 @@ describe("braveProvider.search", () => {
     expect(result.sources[1]).toMatchObject({ url: "https://example.com/b", confidence: 80 });
   });
 
+  // Milestone 118 — Critical Finding C1: Brave's real `description` field
+  // arrives as an HTML fragment (inline <strong> tags, encoded
+  // punctuation). Proves this provider's own normalizeResults() sanitizes
+  // it via sanitizeSnippet() before it ever becomes a Source, rather than
+  // storing it verbatim.
+  it("sanitizes HTML markup and entities out of Brave's raw description field", async () => {
+    vi.stubEnv("BRAVE_API_KEY", "test-key");
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          web: {
+            results: [
+              {
+                title: "A real result",
+                url: "https://example.com/a",
+                description: "They combine <strong>A&amp;D Medical and Omron</strong> sensors",
+              },
+            ],
+          },
+        }),
+    });
+
+    const result = await braveProvider.search({ topic: "startup idea" });
+
+    expect(result.sources[0]?.snippet).toBe("They combine A&D Medical and Omron sensors");
+  });
+
   it("returns ok with an empty sources array for a genuinely empty, valid response", async () => {
     vi.stubEnv("BRAVE_API_KEY", "test-key");
     mockFetchOnce({ ok: true, status: 200, json: () => Promise.resolve({ web: { results: [] } }) });

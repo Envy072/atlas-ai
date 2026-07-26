@@ -5,6 +5,7 @@ import type { Source } from "@/lib/research/schemas/source.schema";
 import { SourceSchema } from "@/lib/research/schemas/source.schema";
 import { fetchWithRetry, RequestTimeoutError } from "@/lib/research/utils/httpRequest";
 import { extractDomain } from "@/lib/research/utils/normalization";
+import { sanitizeSnippet } from "@/lib/research/utils/textSanitization";
 
 const TAVILY_ENDPOINT = "https://api.tavily.com/search";
 
@@ -63,7 +64,7 @@ function normalizeResults(results: TavilyApiResult[], retrievedAt: string): Sour
       title: item.title,
       url: item.url,
       domain: extractDomain(item.url),
-      snippet: item.content,
+      snippet: sanitizeSnippet(item.content),
       publishedAt: item.published_date,
       retrievedAt,
       confidence: toConfidence(item.score),

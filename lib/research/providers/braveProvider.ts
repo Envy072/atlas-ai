@@ -5,6 +5,7 @@ import type { Source } from "@/lib/research/schemas/source.schema";
 import { SourceSchema } from "@/lib/research/schemas/source.schema";
 import { fetchWithRetry, RequestTimeoutError } from "@/lib/research/utils/httpRequest";
 import { extractDomain } from "@/lib/research/utils/normalization";
+import { sanitizeSnippet } from "@/lib/research/utils/textSanitization";
 
 const BRAVE_ENDPOINT = "https://api.search.brave.com/res/v1/web/search";
 
@@ -64,7 +65,7 @@ function normalizeResults(results: BraveApiResult[], retrievedAt: string): Sourc
       title: item.title,
       url: item.url,
       domain: extractDomain(item.url),
-      snippet: item.description,
+      snippet: sanitizeSnippet(item.description),
       retrievedAt,
       confidence: positionBasedConfidence(index),
     };

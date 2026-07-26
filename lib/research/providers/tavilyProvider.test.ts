@@ -54,6 +54,34 @@ describe("tavilyProvider.search", () => {
     expect(result.sources[0]).toMatchObject({ url: "https://example.com/a", confidence: 80 });
   });
 
+  // Milestone 118 — Critical Finding C1: Tavily's real `content` field
+  // arrives as an HTML fragment (inline <strong> tags, encoded
+  // punctuation). Proves this provider's own normalizeResults() sanitizes
+  // it via sanitizeSnippet() before it ever becomes a Source, rather than
+  // storing it verbatim.
+  it("sanitizes HTML markup and entities out of Tavily's raw content field", async () => {
+    vi.stubEnv("TAVILY_API_KEY", "test-key");
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          results: [
+            {
+              title: "A real result",
+              url: "https://example.com/a",
+              content: "<strong>Named &quot;Best Hot Sauce&quot;</strong> — it&#x27;s great",
+              score: 0.8,
+            },
+          ],
+        }),
+    });
+
+    const result = await tavilyProvider.search({ topic: "startup idea" });
+
+    expect(result.sources[0]?.snippet).toBe('Named "Best Hot Sauce" — it\'s great');
+  });
+
   it("falls back to a neutral confidence of 50 when Tavily omits the score field", async () => {
     vi.stubEnv("TAVILY_API_KEY", "test-key");
     mockFetchOnce({

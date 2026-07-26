@@ -62,6 +62,35 @@ describe("crunchbaseProvider.search", () => {
     });
   });
 
+  // Milestone 118 — Critical Finding C1: Crunchbase's real
+  // `short_description` field can arrive with the same HTML-fragment
+  // formatting as Tavily/Brave. Proves this provider's own
+  // normalizeResults() sanitizes it via sanitizeSnippet() before it ever
+  // becomes a Source, for consistency with the other two real providers.
+  it("sanitizes HTML markup and entities out of Crunchbase's raw short_description field", async () => {
+    vi.stubEnv("CRUNCHBASE_API_KEY", "test-key");
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          entities: [
+            {
+              properties: {
+                identifier: { permalink: "example-org" },
+                name: "Example Org",
+                short_description: "Makers of <strong>&quot;the best&quot;</strong> widgets",
+              },
+            },
+          ],
+        }),
+    });
+
+    const result = await crunchbaseProvider.search({ topic: "startup idea" });
+
+    expect(result.sources[0]?.snippet).toBe('Makers of "the best" widgets');
+  });
+
   it("returns ok with an empty sources array for a genuinely empty, valid response", async () => {
     vi.stubEnv("CRUNCHBASE_API_KEY", "test-key");
     mockFetchOnce({ ok: true, status: 200, json: () => Promise.resolve({ entities: [] }) });

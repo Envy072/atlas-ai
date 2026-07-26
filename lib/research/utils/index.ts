@@ -3,3 +3,4 @@ export * from "@/lib/research/utils/deduplication";
 export * from "@/lib/research/utils/sourceFormatting";
 export * from "@/lib/research/utils/rankingPreparation";
 export * from "@/lib/research/utils/httpRequest";
+export * from "@/lib/research/utils/textSanitization";
