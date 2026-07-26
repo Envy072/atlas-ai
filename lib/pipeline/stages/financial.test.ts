@@ -59,7 +59,7 @@ describe("financialStage", () => {
   it("passes the startupIdea through to discoverFinancials' request", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult());
 
-    const result = await financialStage.run("A subscription software platform for team scheduling");
+    const result = await financialStage.run("A subscription software platform for team scheduling", "execution-1");
 
     expect(result.request).toEqual({ startupIdea: "A subscription software platform for team scheduling" });
   });
@@ -67,7 +67,7 @@ describe("financialStage", () => {
   it("returns a real FinancialProfile derived from the mocked research", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await financialStage.run("A subscription software platform for team scheduling");
+    const result = await financialStage.run("A subscription software platform for team scheduling", "execution-1");
 
     expect(result.profile.id).toBeTruthy();
   });
@@ -75,7 +75,7 @@ describe("financialStage", () => {
   it("sets marketIndustry from the real discoverMarket classification", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await financialStage.run("A subscription software platform for team scheduling");
+    const result = await financialStage.run("A subscription software platform for team scheduling", "execution-1");
 
     expect(result.marketIndustry).toBeTruthy();
   });
@@ -85,7 +85,7 @@ describe("financialStage", () => {
       buildResearchResult({ sources: [buildRankedSource({ title: "Acme", url: "https://acme.com" })] })
     );
 
-    const result = await financialStage.run("An idea");
+    const result = await financialStage.run("An idea", "execution-1");
 
     expect(result.competitorCount).toBe(1);
   });
@@ -93,7 +93,7 @@ describe("financialStage", () => {
   it("returns competitorCount 0 when research finds no sources", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await financialStage.run("An idea");
+    const result = await financialStage.run("An idea", "execution-1");
 
     expect(result.competitorCount).toBe(0);
   });

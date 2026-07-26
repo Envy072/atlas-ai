@@ -23,6 +23,16 @@ import { MarketRiskSchema } from "@/lib/market/schemas/risks.schema";
 // only public exports" rule.
 export const MarketProfileSchema = z.object({
   id: z.string(),
+  // Milestone 116 — the owning analysis's own pipeline execution id.
+  // Scopes this profile to exactly one analysis, closing a real
+  // cross-analysis contamination gap (Milestone 114's Critical Finding
+  // #1): resolveMarketKnowledge() used to accumulate every profile
+  // globally by industry alone, so two unrelated analyses classified
+  // into the same industry bucket could merge each other's evidence.
+  // Optional purely for backward compatibility with profiles persisted
+  // before this field existed (inside an already-completed Project's
+  // own profile.marketProfile) — never omitted by any live caller.
+  analysisId: z.string().optional(),
   industry: z.string().min(1),
   subIndustry: z.string().optional(),
   sizing: MarketSizingSchema,

@@ -29,30 +29,37 @@ function buildProfile(overrides: Partial<MarketProfile> = {}): MarketProfile {
 // Milestone 68 — verifies this file's actual, current composition logic:
 // a real MemoryMarketStore is used (no mocking needed, since it's already
 // a genuine, tested implementation), covering the "unclassified" bypass,
-// the new-vs-merged branch (exact industry match, not fuzzy), and the
-// resolved profile being persisted via upsert.
+// the new-vs-merged branch, and the resolved profile being persisted via
+// upsert.
+//
+// Milestone 116 — resolution is scoped by `analysisId`, not by industry
+// alone (Milestone 114's Critical Finding #1: two unrelated analyses
+// classified into the same industry bucket used to merge each other's
+// evidence). Every test below passes an explicit analysisId; the
+// dedicated "cross-analysis isolation" block proves two different
+// analysisIds sharing the same industry never merge.
 describe("resolveMarketKnowledge", () => {
   it("returns an 'unclassified' profile as-is, without persisting it", async () => {
     const store = new MemoryMarketStore();
     const freshProfile = buildProfile({ id: "market_1", industry: "unclassified" });
 
-    const result = await resolveMarketKnowledge(freshProfile, store);
+    const result = await resolveMarketKnowledge(freshProfile, "analysis-1", store);
 
-    expect(result).toEqual(freshProfile);
-    await expect(store.list()).resolves.toEqual([]);
+    expect(result).toEqual({ ...freshProfile, analysisId: "analysis-1" });
+    await expect(store.list("analysis-1")).resolves.toEqual([]);
   });
 
-  it("persists a brand-new profile when no existing profile matches the industry", async () => {
+  it("persists a brand-new profile, stamped with analysisId, when no profile exists yet for this analysis", async () => {
     const store = new MemoryMarketStore();
     const freshProfile = buildProfile({ id: "market_1", industry: "saas" });
 
-    const result = await resolveMarketKnowledge(freshProfile, store);
+    const result = await resolveMarketKnowledge(freshProfile, "analysis-1", store);
 
-    expect(result).toEqual(freshProfile);
-    await expect(store.getById("market_1")).resolves.toEqual(freshProfile);
+    expect(result).toEqual({ ...freshProfile, analysisId: "analysis-1" });
+    await expect(store.getById("market_1")).resolves.toEqual({ ...freshProfile, analysisId: "analysis-1" });
   });
 
-  it("merges into an existing profile when the industry already exists in the store", async () => {
+  it("merges into this SAME analysis's own prior profile when one already exists — the retried-stage case", async () => {
     const store = new MemoryMarketStore();
     await store.upsert(
       buildProfile({
@@ -60,6 +67,7 @@ describe("resolveMarketKnowledge", () => {
         industry: "saas",
         confidence: 40,
         customerSegments: [{ name: "SMB owners", painPoints: [] }],
+        analysisId: "analysis-1",
       })
     );
 
@@ -70,38 +78,72 @@ describe("resolveMarketKnowledge", () => {
       customerSegments: [{ name: "Enterprise buyers", painPoints: [] }],
     });
 
-    const result = await resolveMarketKnowledge(freshProfile, store);
+    const result = await resolveMarketKnowledge(freshProfile, "analysis-1", store);
 
     expect(result.id).toBe("market_existing");
+    expect(result.analysisId).toBe("analysis-1");
     expect(result.confidence).toBe(90);
     expect(result.customerSegments.map((s) => s.name)).toEqual(["SMB owners", "Enterprise buyers"]);
   });
 
   it("persists the merged result back into the store", async () => {
     const store = new MemoryMarketStore();
-    await store.upsert(buildProfile({ id: "market_existing", industry: "saas" }));
+    await store.upsert(buildProfile({ id: "market_existing", industry: "saas", analysisId: "analysis-1" }));
 
     const freshProfile = buildProfile({ id: "market_fresh", industry: "saas", confidence: 90 });
-    const result = await resolveMarketKnowledge(freshProfile, store);
+    const result = await resolveMarketKnowledge(freshProfile, "analysis-1", store);
 
     await expect(store.getById("market_existing")).resolves.toEqual(result);
-  });
-
-  it("matches industries case/whitespace-insensitively via the store's own findByIndustry", async () => {
-    const store = new MemoryMarketStore();
-    await store.upsert(buildProfile({ id: "market_existing", industry: "SaaS" }));
-
-    const freshProfile = buildProfile({ id: "market_fresh", industry: "  saas  ", confidence: 70 });
-    const result = await resolveMarketKnowledge(freshProfile, store);
-
-    expect(result.id).toBe("market_existing");
   });
 
   it("defaults to the shared defaultMarketStore when no store is given", async () => {
     const freshProfile = buildProfile({ id: "market_default_store_test", industry: "unclassified" });
 
-    const result = await resolveMarketKnowledge(freshProfile);
+    const result = await resolveMarketKnowledge(freshProfile, "analysis-default-store-test");
 
-    expect(result).toEqual(freshProfile);
+    expect(result).toEqual({ ...freshProfile, analysisId: "analysis-default-store-test" });
+  });
+
+  // Milestone 116 — the actual regression this milestone exists to add.
+  describe("cross-analysis isolation", () => {
+    it("never merges two different analyses' profiles, even when both share the exact same industry", async () => {
+      const store = new MemoryMarketStore();
+      await store.upsert(
+        buildProfile({
+          id: "market_analysis_a",
+          industry: "saas",
+          confidence: 40,
+          sources: [],
+          analysisId: "analysis-a",
+        })
+      );
+
+      const freshProfileForB = buildProfile({
+        id: "market_analysis_b_fresh",
+        industry: "saas",
+        confidence: 90,
+      });
+
+      const result = await resolveMarketKnowledge(freshProfileForB, "analysis-b", store);
+
+      // Resolving for analysis-b must never find, merge into, or
+      // overwrite analysis-a's own profile — it gets its own, brand-new
+      // record, even though the industry ("saas") is identical.
+      expect(result.id).toBe("market_analysis_b_fresh");
+      expect(result.analysisId).toBe("analysis-b");
+
+      const analysisAProfile = await store.getByAnalysisId("analysis-a");
+      expect(analysisAProfile?.id).toBe("market_analysis_a");
+      expect(analysisAProfile?.confidence).toBe(40);
+    });
+
+    it("scopes getByAnalysisId itself so a shared industry never leaks across analyses", async () => {
+      const store = new MemoryMarketStore();
+      await store.upsert(buildProfile({ id: "market_1", industry: "saas", analysisId: "analysis-a" }));
+      await store.upsert(buildProfile({ id: "market_2", industry: "saas", analysisId: "analysis-b" }));
+
+      await expect(store.getByAnalysisId("analysis-a")).resolves.toMatchObject({ id: "market_1" });
+      await expect(store.getByAnalysisId("analysis-b")).resolves.toMatchObject({ id: "market_2" });
+    });
   });
 });

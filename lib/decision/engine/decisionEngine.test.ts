@@ -74,7 +74,7 @@ describe("synthesizeDecision", () => {
   it("returns a request that echoes the input startupIdea", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult());
 
-    const result = await synthesizeDecision({ startupIdea: "A subscription scheduling tool" });
+    const result = await synthesizeDecision({ startupIdea: "A subscription scheduling tool" }, "execution-1");
 
     expect(result.request).toEqual({ startupIdea: "A subscription scheduling tool" });
   });
@@ -82,7 +82,7 @@ describe("synthesizeDecision", () => {
   it("returns a real, schema-valid DecisionProfile when research finds no sources", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await synthesizeDecision({ startupIdea: "An idea" });
+    const result = await synthesizeDecision({ startupIdea: "An idea" }, "execution-2");
 
     expect(result.profile).toBeDefined();
     expect(result.profile.decisionContext.startupIdea).toBe("An idea");
@@ -93,7 +93,7 @@ describe("synthesizeDecision", () => {
       buildResearchResult({ sources: [buildRankedSource({ title: "Acme", url: "https://acme.com" })] })
     );
 
-    const result = await synthesizeDecision({ startupIdea: "An idea" });
+    const result = await synthesizeDecision({ startupIdea: "An idea" }, "execution-3");
 
     expect(result.profile.marketProfile).toBeDefined();
     expect(result.profile.financialProfile).toBeDefined();
@@ -105,7 +105,7 @@ describe("synthesizeDecision", () => {
     runResearchMock.mockResolvedValue(buildResearchResult());
     const before = Date.now();
 
-    const result = await synthesizeDecision({ startupIdea: "An idea" });
+    const result = await synthesizeDecision({ startupIdea: "An idea" }, "execution-4");
 
     const after = Date.now();
     const generatedAtMs = Date.parse(result.generatedAt);
@@ -120,7 +120,7 @@ describe("synthesizeDecision's decisionContext wiring", () => {
       buildResearchResult({ sources: [buildRankedSource({ title: "Acme", url: "https://acme.com" })] })
     );
 
-    const result = await synthesizeDecision({ startupIdea: "An idea" });
+    const result = await synthesizeDecision({ startupIdea: "An idea" }, "execution-5");
 
     expect(result.profile.decisionContext.competitorCount).toBe(result.profile.keyCompetitors.length);
   });
@@ -128,7 +128,7 @@ describe("synthesizeDecision's decisionContext wiring", () => {
   it("sets marketIndustry from the resolved marketProfile's own industry", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await synthesizeDecision({ startupIdea: "An idea" });
+    const result = await synthesizeDecision({ startupIdea: "An idea" }, "execution-6");
 
     expect(result.profile.decisionContext.marketIndustry).toBe(result.profile.marketProfile.industry);
   });
@@ -136,7 +136,7 @@ describe("synthesizeDecision's decisionContext wiring", () => {
   it("sets fundingStage from the financial platform's own discovery, unchanged", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await synthesizeDecision({ startupIdea: "An idea" });
+    const result = await synthesizeDecision({ startupIdea: "An idea" }, "execution-7");
 
     expect(result.profile.decisionContext.fundingStage).toBe(result.profile.financialProfile.fundingStage);
   });
@@ -146,7 +146,7 @@ describe("synthesizeDecision's businessSummary and SWOT projection", () => {
   it("projects businessSummary fields directly from the resolved BusinessProfile, unchanged", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await synthesizeDecision({ startupIdea: "An idea" });
+    const result = await synthesizeDecision({ startupIdea: "An idea" }, "execution-8");
 
     expect(result.profile.businessSummary.businessModel).toBe(result.profile.businessProfile.businessModel);
     expect(result.profile.businessSummary.valueProposition).toBe(result.profile.businessProfile.valueProposition);
@@ -160,7 +160,7 @@ describe("synthesizeDecision's businessSummary and SWOT projection", () => {
   it("projects strengths/weaknesses/opportunities/threats directly from the BusinessProfile's own SWOT, unchanged", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await synthesizeDecision({ startupIdea: "An idea" });
+    const result = await synthesizeDecision({ startupIdea: "An idea" }, "execution-9");
 
     expect(result.profile.strengths).toEqual(result.profile.businessProfile.businessStrengths);
     expect(result.profile.weaknesses).toEqual(result.profile.businessProfile.businessWeaknesses);
@@ -179,7 +179,7 @@ describe("synthesizeDecision's evidence aggregation", () => {
       })
     );
 
-    const result = await synthesizeDecision({ startupIdea: "An idea" });
+    const result = await synthesizeDecision({ startupIdea: "An idea" }, "execution-10");
 
     const matchingEvidence = result.profile.evidence.filter((item) => item.url === "https://acme.com");
     expect(matchingEvidence).toHaveLength(1);
@@ -188,8 +188,69 @@ describe("synthesizeDecision's evidence aggregation", () => {
   it("returns an empty evidence list when research finds nothing anywhere", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [], evidence: [] }));
 
-    const result = await synthesizeDecision({ startupIdea: "An idea" });
+    const result = await synthesizeDecision({ startupIdea: "An idea" }, "execution-11");
 
     expect(result.profile.evidence).toEqual([]);
+  });
+});
+
+// Milestone 116 — closes Milestone 114's Critical Finding #1 directly at
+// this layer (one level below lib/pipeline/stages/decision.test.ts's own
+// equivalent coverage): resolveMarketKnowledge()/resolveCompetitorKnowledge()
+// are real here (not mocked), running against the real, shared,
+// module-level default stores — the same production wiring path.
+describe("synthesizeDecision's cross-analysis isolation (Milestone 116)", () => {
+  it("stamps the resolved marketProfile and every keyCompetitor with the caller's own analysisId", async () => {
+    runResearchMock.mockResolvedValue(
+      buildResearchResult({ sources: [buildRankedSource({ title: "Acme", url: "https://acme.com" })] })
+    );
+
+    const result = await synthesizeDecision({ startupIdea: "An idea" }, "execution-stamp-test");
+
+    expect(result.profile.marketProfile.analysisId).toBe("execution-stamp-test");
+    for (const competitor of result.profile.keyCompetitors) {
+      expect(competitor.analysisId).toBe("execution-stamp-test");
+    }
+  });
+
+  it("never merges market evidence between two calls with different analysisIds, even for the identical startupIdea", async () => {
+    const evidenceX = buildRankedSource({
+      id: "source_x",
+      title: "Call X's own distinctive source",
+      url: "https://call-x-only.example.com",
+    });
+    const evidenceY = buildRankedSource({
+      id: "source_y",
+      title: "Call Y's own distinctive source",
+      url: "https://call-y-only.example.com",
+    });
+    const idea = "A subscription platform for identical repeated calls";
+
+    runResearchMock.mockResolvedValue(buildResearchResult({ sources: [evidenceX] }));
+    const resultX = await synthesizeDecision({ startupIdea: idea }, "execution-repeat-x");
+
+    runResearchMock.mockResolvedValue(buildResearchResult({ sources: [evidenceY] }));
+    const resultY = await synthesizeDecision({ startupIdea: idea }, "execution-repeat-y");
+
+    const urlsX = resultX.profile.marketProfile.sources.map((source) => source.url);
+    const urlsY = resultY.profile.marketProfile.sources.map((source) => source.url);
+
+    expect(urlsX).not.toContain("https://call-y-only.example.com");
+    expect(urlsY).not.toContain("https://call-x-only.example.com");
+  });
+
+  it("resolves the same analysisId called twice against its own prior state, not a fresh, disconnected profile — the retried-stage case", async () => {
+    runResearchMock.mockResolvedValue(
+      buildResearchResult({ sources: [buildRankedSource({ title: "Acme", url: "https://acme.com" })] })
+    );
+
+    const first = await synthesizeDecision({ startupIdea: "A subscription retry-scoped idea" }, "execution-retry");
+    const second = await synthesizeDecision({ startupIdea: "A subscription retry-scoped idea" }, "execution-retry");
+
+    // Same analysisId, called again (mirroring a decision-stage retry
+    // for the same execution) — resolves against its OWN prior
+    // MarketProfile record (same id), never creates a second, unrelated
+    // one for the identical analysisId.
+    expect(second.profile.marketProfile.id).toBe(first.profile.marketProfile.id);
   });
 });

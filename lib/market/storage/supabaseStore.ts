@@ -16,12 +16,13 @@ export class SupabaseMarketStore implements MarketKnowledgeStore {
     );
   }
 
-  async findByIndustry(industry: string): Promise<MarketProfile | null> {
-    void industry;
-    throw new Error("SupabaseMarketStore.findByIndustry is not implemented yet.");
+  async getByAnalysisId(analysisId: string): Promise<MarketProfile | null> {
+    void analysisId;
+    throw new Error("SupabaseMarketStore.getByAnalysisId is not implemented yet.");
   }
 
-  async list(): Promise<MarketProfile[]> {
+  async list(analysisId: string): Promise<MarketProfile[]> {
+    void analysisId;
     throw new Error("SupabaseMarketStore.list is not implemented yet.");
   }
 

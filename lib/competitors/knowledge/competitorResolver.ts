@@ -14,11 +14,27 @@ import { defaultCompetitorStore } from "@/lib/competitors/storage/defaultStore";
 // of its own. Its one genuine piece of new logic is batch-aware
 // deduplication (see below) — the correctness property Section 5/
 // Complexity Review of the design justified this function's existence on.
+//
+// Milestone 116 — every lookup is scoped to `analysisId`, the owning
+// analysis's own pipeline execution id. The original design
+// (MILESTONE_16_DESIGN.md) matched a candidate against every company
+// ever discovered by any analysis, globally — durable accumulation
+// *across* analyses was the explicit intent at the time, written before
+// Authentication (Milestone 27) gave this codebase any concept of
+// per-analysis identity to scope by. Left unscoped, two completely
+// unrelated analyses could fuzzy-match onto the same stored company
+// (most visibly for generic, low-confidence candidate names — Milestone
+// 114's Critical Finding #1, directly reproduced live). This resolver
+// now only ever matches a candidate against companies already resolved
+// within this SAME analysis (relevant for a retried decision stage),
+// never another analysis's — durable cross-analysis accumulation is
+// retired, not preserved with a smaller blast radius.
 export async function resolveCompetitorKnowledge(
   candidates: DiscoveredCompetitor[],
+  analysisId: string,
   store: CompetitorKnowledgeStore = defaultCompetitorStore
 ): Promise<CompanyProfile[]> {
-  const storedProfiles = await store.list();
+  const storedProfiles = await store.list(analysisId);
   const resolvedById = new Map<string, CompanyProfile>();
 
   // Every candidate is matched against the store's contents PLUS every
@@ -29,7 +45,8 @@ export async function resolveCompetitorKnowledge(
   // candidateExtraction.ts's own simpler name+domain grouping didn't
   // catch) resolve through the exact same matcher as a cross-run
   // duplicate would, with no special-cased branch for "same batch" vs.
-  // "earlier run".
+  // "earlier run". Both sources are already scoped to this analysisId —
+  // storedProfiles via store.list(analysisId) above.
   function knownProfilesSoFar(): CompanyProfile[] {
     const resolvedIds = new Set(resolvedById.keys());
     return [...storedProfiles.filter((profile) => !resolvedIds.has(profile.id)), ...resolvedById.values()];
@@ -61,13 +78,13 @@ export async function resolveCompetitorKnowledge(
           evidence: candidate.evidence,
           confidence: candidate.confidence,
         })
-      : buildCompanyProfile({
+      : { ...buildCompanyProfile({
           name: candidate.candidateName,
           website: candidate.website,
           sources: candidate.sources,
           evidence: candidate.evidence,
           confidence: candidate.confidence,
-        });
+        }), analysisId };
 
     await store.upsert(profile);
     resolvedById.set(profile.id, profile);

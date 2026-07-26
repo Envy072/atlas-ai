@@ -46,14 +46,14 @@ describe("VectorDbCompetitorStore", () => {
 
   it("rejects on findByName", async () => {
     const store = new VectorDbCompetitorStore();
-    await expect(store.findByName("Acme")).rejects.toThrow(
+    await expect(store.findByName("Acme", "analysis-1")).rejects.toThrow(
       "VectorDbCompetitorStore.findByName is not implemented yet."
     );
   });
 
   it("rejects on list", async () => {
     const store = new VectorDbCompetitorStore();
-    await expect(store.list()).rejects.toThrow("VectorDbCompetitorStore.list is not implemented yet.");
+    await expect(store.list("analysis-1")).rejects.toThrow("VectorDbCompetitorStore.list is not implemented yet.");
   });
 
   it("rejects on upsert", async () => {

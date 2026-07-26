@@ -42,7 +42,7 @@ describe("researchStage", () => {
   it("calls runResearch with the pipeline's own general-framing query", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult());
 
-    await researchStage.run("A subscription software platform for team scheduling");
+    await researchStage.run("A subscription software platform for team scheduling", "execution-1");
 
     expect(runResearchMock).toHaveBeenCalledWith({
       topic: "general research pass for: A subscription software platform for team scheduling",
@@ -56,6 +56,6 @@ describe("researchStage", () => {
     });
     runResearchMock.mockResolvedValue(result);
 
-    await expect(researchStage.run("An idea")).resolves.toEqual(result);
+    await expect(researchStage.run("An idea", "execution-1")).resolves.toEqual(result);
   });
 });

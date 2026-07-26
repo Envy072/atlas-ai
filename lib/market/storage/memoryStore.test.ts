@@ -26,9 +26,10 @@ function buildProfile(overrides: Partial<MarketProfile> = {}): MarketProfile {
 }
 
 // Milestone 64 — verifies this file's actual, current in-process Map-backed
-// behavior, including findByIndustry — the secondary index specific to
-// this platform's store, case/whitespace-insensitive via
-// normalizeIndustryName (already tested, M61).
+// behavior. Milestone 116 replaced the old, global findByIndustry secondary
+// index with getByAnalysisId()/an analysisId-scoped list() — every profile
+// now belongs to exactly one analysis (Milestone 114's Critical Finding
+// #1), so lookups are by that id, never by industry alone.
 describe("MemoryMarketStore", () => {
   let store: MemoryMarketStore;
 
@@ -53,26 +54,35 @@ describe("MemoryMarketStore", () => {
     expect(result?.confidence).toBe(90);
   });
 
-  it("finds a profile by exact industry, case/whitespace-insensitively", async () => {
-    await store.upsert(buildProfile({ id: "market_1", industry: "SaaS" }));
-    await expect(store.findByIndustry("  saas  ")).resolves.toMatchObject({ id: "market_1" });
+  it("finds a profile by its own analysisId", async () => {
+    await store.upsert(buildProfile({ id: "market_1", analysisId: "analysis-a" }));
+    await expect(store.getByAnalysisId("analysis-a")).resolves.toMatchObject({ id: "market_1" });
   });
 
-  it("returns null from findByIndustry when no industry matches", async () => {
-    await store.upsert(buildProfile({ id: "market_1", industry: "saas" }));
-    await expect(store.findByIndustry("fintech")).resolves.toBeNull();
+  it("returns null from getByAnalysisId when no profile matches that analysisId", async () => {
+    await store.upsert(buildProfile({ id: "market_1", analysisId: "analysis-a" }));
+    await expect(store.getByAnalysisId("analysis-b")).resolves.toBeNull();
   });
 
-  it("lists every stored profile", async () => {
-    await store.upsert(buildProfile({ id: "market_1" }));
-    await store.upsert(buildProfile({ id: "market_2" }));
+  it("never returns a profile belonging to a different analysisId, even when the industry matches", async () => {
+    await store.upsert(buildProfile({ id: "market_1", industry: "saas", analysisId: "analysis-a" }));
+    await store.upsert(buildProfile({ id: "market_2", industry: "saas", analysisId: "analysis-b" }));
 
-    const all = await store.list();
-    expect(all.map((profile) => profile.id).sort()).toEqual(["market_1", "market_2"]);
+    await expect(store.getByAnalysisId("analysis-a")).resolves.toMatchObject({ id: "market_1" });
+    await expect(store.getByAnalysisId("analysis-b")).resolves.toMatchObject({ id: "market_2" });
   });
 
-  it("returns an empty list when nothing has been stored", async () => {
-    await expect(store.list()).resolves.toEqual([]);
+  it("lists only profiles belonging to the given analysisId", async () => {
+    await store.upsert(buildProfile({ id: "market_1", analysisId: "analysis-a" }));
+    await store.upsert(buildProfile({ id: "market_2", analysisId: "analysis-b" }));
+
+    const scopedToA = await store.list("analysis-a");
+    expect(scopedToA.map((profile) => profile.id)).toEqual(["market_1"]);
+  });
+
+  it("returns an empty list when nothing matches the given analysisId", async () => {
+    await store.upsert(buildProfile({ id: "market_1", analysisId: "analysis-a" }));
+    await expect(store.list("analysis-b")).resolves.toEqual([]);
   });
 
   it("deletes a profile by id", async () => {

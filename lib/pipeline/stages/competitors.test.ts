@@ -59,7 +59,7 @@ describe("competitorsStage", () => {
   it("passes the startupIdea through to discoverCompetitors' request", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult());
 
-    const result = await competitorsStage.run("A subscription software platform for team scheduling");
+    const result = await competitorsStage.run("A subscription software platform for team scheduling", "execution-1");
 
     expect(result.request).toEqual({ startupIdea: "A subscription software platform for team scheduling" });
   });
@@ -69,7 +69,7 @@ describe("competitorsStage", () => {
       buildResearchResult({ sources: [buildRankedSource({ title: "Acme", url: "https://acme.com" })] })
     );
 
-    const result = await competitorsStage.run("An idea");
+    const result = await competitorsStage.run("An idea", "execution-1");
 
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0].candidateName).toBe("Acme");
@@ -78,7 +78,7 @@ describe("competitorsStage", () => {
   it("returns an empty candidate list when research finds no sources", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await competitorsStage.run("An idea");
+    const result = await competitorsStage.run("An idea", "execution-1");
 
     expect(result.candidates).toEqual([]);
   });

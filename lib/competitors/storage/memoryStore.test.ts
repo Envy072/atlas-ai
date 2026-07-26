@@ -29,8 +29,10 @@ function buildProfile(overrides: Partial<CompanyProfile> = {}): CompanyProfile {
 // Milestone 53 — verifies this file's actual, current in-process Map-backed
 // behavior: exact-id lookups, a case/whitespace-insensitive scan across
 // both `name` and `aliases` for findByName, and standard upsert/delete
-// semantics. No durability claims are tested — that's explicitly not this
-// store's job.
+// semantics. Milestone 116 scoped findByName()/list() to the caller's own
+// analysisId — every profile now belongs to exactly one analysis
+// (Milestone 114's Critical Finding #1), so a name/alias match is never
+// returned across analyses.
 describe("MemoryCompetitorStore", () => {
   let store: MemoryCompetitorStore;
 
@@ -55,31 +57,39 @@ describe("MemoryCompetitorStore", () => {
     expect(result?.confidence).toBe(90);
   });
 
-  it("finds a profile by exact name, case/whitespace-insensitively", async () => {
-    await store.upsert(buildProfile({ id: "company_1", name: "Acme" }));
-    await expect(store.findByName("  ACME  ")).resolves.toMatchObject({ id: "company_1" });
+  it("finds a profile by exact name within the given analysisId, case/whitespace-insensitively", async () => {
+    await store.upsert(buildProfile({ id: "company_1", name: "Acme", analysisId: "analysis-a" }));
+    await expect(store.findByName("  ACME  ", "analysis-a")).resolves.toMatchObject({ id: "company_1" });
   });
 
-  it("finds a profile by one of its aliases", async () => {
-    await store.upsert(buildProfile({ id: "company_1", name: "Acme", aliases: ["Acme Corp"] }));
-    await expect(store.findByName("acme corp")).resolves.toMatchObject({ id: "company_1" });
+  it("finds a profile by one of its aliases within the given analysisId", async () => {
+    await store.upsert(
+      buildProfile({ id: "company_1", name: "Acme", aliases: ["Acme Corp"], analysisId: "analysis-a" })
+    );
+    await expect(store.findByName("acme corp", "analysis-a")).resolves.toMatchObject({ id: "company_1" });
   });
 
   it("returns null from findByName when no name or alias matches", async () => {
-    await store.upsert(buildProfile({ id: "company_1", name: "Acme" }));
-    await expect(store.findByName("HubSpot")).resolves.toBeNull();
+    await store.upsert(buildProfile({ id: "company_1", name: "Acme", analysisId: "analysis-a" }));
+    await expect(store.findByName("HubSpot", "analysis-a")).resolves.toBeNull();
   });
 
-  it("lists every stored profile", async () => {
-    await store.upsert(buildProfile({ id: "company_1" }));
-    await store.upsert(buildProfile({ id: "company_2" }));
-
-    const all = await store.list();
-    expect(all.map((profile) => profile.id).sort()).toEqual(["company_1", "company_2"]);
+  it("never returns a profile matching by name if it belongs to a different analysisId", async () => {
+    await store.upsert(buildProfile({ id: "company_1", name: "Acme", analysisId: "analysis-a" }));
+    await expect(store.findByName("Acme", "analysis-b")).resolves.toBeNull();
   });
 
-  it("returns an empty list when nothing has been stored", async () => {
-    await expect(store.list()).resolves.toEqual([]);
+  it("lists only profiles belonging to the given analysisId", async () => {
+    await store.upsert(buildProfile({ id: "company_1", analysisId: "analysis-a" }));
+    await store.upsert(buildProfile({ id: "company_2", analysisId: "analysis-b" }));
+
+    const scopedToA = await store.list("analysis-a");
+    expect(scopedToA.map((profile) => profile.id)).toEqual(["company_1"]);
+  });
+
+  it("returns an empty list when nothing matches the given analysisId", async () => {
+    await store.upsert(buildProfile({ id: "company_1", analysisId: "analysis-a" }));
+    await expect(store.list("analysis-b")).resolves.toEqual([]);
   });
 
   it("deletes a profile by id", async () => {

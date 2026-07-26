@@ -47,14 +47,14 @@ describe("SupabaseCompetitorStore", () => {
 
   it("rejects on findByName", async () => {
     const store = new SupabaseCompetitorStore();
-    await expect(store.findByName("Acme")).rejects.toThrow(
+    await expect(store.findByName("Acme", "analysis-1")).rejects.toThrow(
       "SupabaseCompetitorStore.findByName is not implemented yet."
     );
   });
 
   it("rejects on list", async () => {
     const store = new SupabaseCompetitorStore();
-    await expect(store.list()).rejects.toThrow("SupabaseCompetitorStore.list is not implemented yet.");
+    await expect(store.list("analysis-1")).rejects.toThrow("SupabaseCompetitorStore.list is not implemented yet.");
   });
 
   it("rejects on upsert", async () => {

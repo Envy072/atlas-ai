@@ -6,6 +6,10 @@ import type { CompetitorKnowledgeStore } from "@/lib/competitors/types/storage";
 // for local development and single-instance deploys; see
 // supabaseStore.ts/postgresStore.ts/vectorStore.ts for the durable,
 // multi-instance story.
+//
+// Milestone 116 — findByName()/list() both require and filter by the
+// caller's own analysisId: ownership is enforced by the store itself, not
+// by a caller remembering to check.
 export class MemoryCompetitorStore implements CompetitorKnowledgeStore {
   private readonly byId = new Map<string, CompanyProfile>();
 
@@ -13,10 +17,11 @@ export class MemoryCompetitorStore implements CompetitorKnowledgeStore {
     return this.byId.get(id) ?? null;
   }
 
-  async findByName(name: string): Promise<CompanyProfile | null> {
+  async findByName(name: string, analysisId: string): Promise<CompanyProfile | null> {
     const normalized = name.trim().toLowerCase();
 
     for (const profile of this.byId.values()) {
+      if (profile.analysisId !== analysisId) continue;
       const names = [profile.name, ...profile.aliases].map((value) => value.trim().toLowerCase());
       if (names.includes(normalized)) return profile;
     }
@@ -24,8 +29,8 @@ export class MemoryCompetitorStore implements CompetitorKnowledgeStore {
     return null;
   }
 
-  async list(): Promise<CompanyProfile[]> {
-    return Array.from(this.byId.values());
+  async list(analysisId: string): Promise<CompanyProfile[]> {
+    return Array.from(this.byId.values()).filter((profile) => profile.analysisId === analysisId);
   }
 
   async upsert(profile: CompanyProfile): Promise<void> {

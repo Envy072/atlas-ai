@@ -60,7 +60,7 @@ describe("businessStage", () => {
   it("passes the startupIdea through to discoverBusiness' request", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult());
 
-    const result = await businessStage.run("A subscription software platform for team scheduling");
+    const result = await businessStage.run("A subscription software platform for team scheduling", "execution-1");
 
     expect(result.request).toEqual({ startupIdea: "A subscription software platform for team scheduling" });
   });
@@ -68,7 +68,7 @@ describe("businessStage", () => {
   it("returns a real BusinessProfile derived from the mocked research", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await businessStage.run("A subscription software platform for team scheduling");
+    const result = await businessStage.run("A subscription software platform for team scheduling", "execution-1");
 
     expect(result.profile.id).toBeTruthy();
   });
@@ -76,7 +76,7 @@ describe("businessStage", () => {
   it("sets marketIndustry from the real discoverMarket classification", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await businessStage.run("A subscription software platform for team scheduling");
+    const result = await businessStage.run("A subscription software platform for team scheduling", "execution-1");
 
     expect(result.marketIndustry).toBeTruthy();
   });
@@ -86,7 +86,7 @@ describe("businessStage", () => {
       buildResearchResult({ sources: [buildRankedSource({ title: "Acme", url: "https://acme.com" })] })
     );
 
-    const result = await businessStage.run("An idea");
+    const result = await businessStage.run("An idea", "execution-1");
 
     expect(result.competitorCount).toBe(1);
   });
@@ -94,7 +94,7 @@ describe("businessStage", () => {
   it("returns competitorCount 0 when research finds no sources", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await businessStage.run("An idea");
+    const result = await businessStage.run("An idea", "execution-1");
 
     expect(result.competitorCount).toBe(0);
   });

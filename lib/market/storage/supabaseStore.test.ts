@@ -43,16 +43,16 @@ describe("SupabaseMarketStore", () => {
     );
   });
 
-  it("rejects on findByIndustry", async () => {
+  it("rejects on getByAnalysisId", async () => {
     const store = new SupabaseMarketStore();
-    await expect(store.findByIndustry("saas")).rejects.toThrow(
-      "SupabaseMarketStore.findByIndustry is not implemented yet."
+    await expect(store.getByAnalysisId("analysis-1")).rejects.toThrow(
+      "SupabaseMarketStore.getByAnalysisId is not implemented yet."
     );
   });
 
   it("rejects on list", async () => {
     const store = new SupabaseMarketStore();
-    await expect(store.list()).rejects.toThrow("SupabaseMarketStore.list is not implemented yet.");
+    await expect(store.list("analysis-1")).rejects.toThrow("SupabaseMarketStore.list is not implemented yet.");
   });
 
   it("rejects on upsert", async () => {

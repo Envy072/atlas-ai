@@ -180,7 +180,11 @@ async function executeStageWithRetry<TResult>(
 
     let result: TResult;
     try {
-      result = await stage.run(current.startupIdea);
+      // Milestone 116 — current.id (this execution's own id) is passed
+      // to every stage so decisionStage can scope market/competitor
+      // knowledge resolution to this one analysis; the other five
+      // stages simply don't declare a second parameter and ignore it.
+      result = await stage.run(current.startupIdea, current.id);
     } catch (error) {
       const failedAt = new Date();
       const message = getErrorMessage(error);

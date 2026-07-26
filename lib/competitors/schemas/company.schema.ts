@@ -18,6 +18,16 @@ import { RefreshMetadataSchema } from "@/lib/competitors/schemas/refresh.schema"
 // equivalent shape here, per this project's "one schema per shape" rule.
 export const CompanyProfileSchema = z.object({
   id: z.string(),
+  // Milestone 116 — the owning analysis's own pipeline execution id.
+  // Scopes this profile to exactly one analysis, closing a real
+  // cross-analysis contamination gap (Milestone 114's Critical Finding
+  // #1): resolveCompetitorKnowledge() used to fuzzy-match every
+  // candidate against every company ever discovered by any analysis,
+  // globally. Optional purely for backward compatibility with profiles
+  // persisted before this field existed (inside an already-completed
+  // Project's own profile.keyCompetitors) — never omitted by any live
+  // caller.
+  analysisId: z.string().optional(),
   name: z.string().min(1),
   aliases: z.array(z.string()),
   website: z.string().url().optional(),

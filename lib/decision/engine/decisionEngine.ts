@@ -47,8 +47,20 @@ function buildDecisionResearchQuery(startupIdea: string): string {
 // already calls Market+Competitors+Research internally — an established,
 // architecturally sound pattern (verified in ARCHITECTURE_REVIEW.md
 // Check 3), not a duplication of logic.
+// Milestone 116 — `analysisId` (the owning pipeline execution's own id)
+// is a plain function parameter, not a field on DecisionSynthesisRequest:
+// it exists only to scope the two resolver calls below to this one
+// analysis, and DecisionSynthesisRequest is itself persisted (inside
+// PipelineExecution.context.decision.request, Milestone 107/108) — a
+// schema change there would need the same backward-compatibility
+// handling MarketProfile.analysisId/CompanyProfile.analysisId already
+// need, for no benefit, since nothing reads this specific value back
+// later. Required (never optional) here: the only real caller
+// (lib/pipeline/stages/decision.ts) always has its own execution id
+// available from the moment it starts.
 export async function synthesizeDecision(
-  request: DecisionSynthesisRequest
+  request: DecisionSynthesisRequest,
+  analysisId: string
 ): Promise<DecisionSynthesisResult> {
   const [researchResult, competitorDiscovery, marketDiscovery, financialDiscovery, businessDiscovery] =
     await Promise.all([
@@ -60,23 +72,26 @@ export async function synthesizeDecision(
     ]);
 
   // Milestone 16: resolves this run's raw, unpersisted discovery
-  // candidates into real, identity-matched, accumulating CompanyProfile
-  // records — the "caller's job" COMPETITOR_PLATFORM.md always said
-  // discovery itself never does (MILESTONE_16_DESIGN.md). Decision never
-  // matches, builds, or merges a company itself — this is a single call
-  // into lib/competitors' own public barrel, exactly like every other
-  // platform Decision already consumes.
-  const keyCompetitors = await resolveCompetitorKnowledge(competitorDiscovery.candidates);
+  // candidates into real, identity-matched CompanyProfile records — the
+  // "caller's job" COMPETITOR_PLATFORM.md always said discovery itself
+  // never does (MILESTONE_16_DESIGN.md). Decision never matches, builds,
+  // or merges a company itself — this is a single call into
+  // lib/competitors' own public barrel, exactly like every other
+  // platform Decision already consumes. As of Milestone 116, scoped to
+  // this analysisId — see resolveCompetitorKnowledge's own comment.
+  const keyCompetitors = await resolveCompetitorKnowledge(competitorDiscovery.candidates, analysisId);
 
   // Milestone 17: resolves this run's freshly-built, unpersisted
-  // MarketProfile into the accumulating knowledge base — the "caller's
-  // job" MARKET_PLATFORM.md always said discovery itself never does
-  // (MILESTONE_17_DESIGN.md). Only the durable-knowledge slice of
-  // MarketProfile accumulates (identity, durable facts, evidence) —
-  // sizing/growthRate/marketMaturity stay excluded from the merge
-  // contract, unchanged, per "## Knowledge vs Observation". Decision
-  // never classifies, sizes, or scores a market itself.
-  const marketProfile = await resolveMarketKnowledge(marketDiscovery.profile);
+  // MarketProfile into a real, identity-matched MarketProfile record —
+  // the "caller's job" MARKET_PLATFORM.md always said discovery itself
+  // never does (MILESTONE_17_DESIGN.md). Only the durable-knowledge
+  // slice of MarketProfile accumulates (identity, durable facts,
+  // evidence) — sizing/growthRate/marketMaturity stay excluded from the
+  // merge contract, unchanged, per "## Knowledge vs Observation".
+  // Decision never classifies, sizes, or scores a market itself. As of
+  // Milestone 116, scoped to this analysisId — see
+  // resolveMarketKnowledge's own comment.
+  const marketProfile = await resolveMarketKnowledge(marketDiscovery.profile, analysisId);
 
   const aggregated = aggregateEvidence(
     [

@@ -61,7 +61,7 @@ describe("decisionStage", () => {
   it("passes the startupIdea through to synthesizeDecision's request", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult());
 
-    const result = await decisionStage.run("A subscription software platform for team scheduling");
+    const result = await decisionStage.run("A subscription software platform for team scheduling", "execution-1");
 
     expect(result.request).toEqual({ startupIdea: "A subscription software platform for team scheduling" });
   });
@@ -69,7 +69,7 @@ describe("decisionStage", () => {
   it("returns a real, schema-valid DecisionProfile when research finds no sources", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await decisionStage.run("A subscription software platform for team scheduling");
+    const result = await decisionStage.run("A subscription software platform for team scheduling", "execution-2");
 
     expect(result.profile).toBeDefined();
     expect(result.profile.decisionContext.startupIdea).toBe(
@@ -82,7 +82,7 @@ describe("decisionStage", () => {
       buildResearchResult({ sources: [buildRankedSource({ title: "Acme", url: "https://acme.com" })] })
     );
 
-    const result = await decisionStage.run("An idea");
+    const result = await decisionStage.run("An idea", "execution-3");
 
     expect(result.profile.decisionContext.competitorCount).toBeGreaterThanOrEqual(0);
     expect(result.profile.marketProfile).toBeDefined();
@@ -114,8 +114,87 @@ describe("decisionStage", () => {
 
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [], evidence }));
 
-    const result = await decisionStage.run("An idea");
+    const result = await decisionStage.run("An idea", "execution-4");
 
     expect(result.profile.evidence.length).toBeGreaterThanOrEqual(1);
+  });
+
+  // Milestone 116 — closes Milestone 114's Critical Finding #1 (cross-
+  // analysis knowledge contamination). Deliberately does NOT mock
+  // resolveMarketKnowledge()/resolveCompetitorKnowledge(): this exercises
+  // the real resolvers against the real, shared, module-level
+  // defaultMarketStore/defaultCompetitorStore singletons — the exact
+  // production wiring path — so this proves isolation is enforced by the
+  // store itself, not by a test double that assumes it.
+  describe("cross-analysis isolation (Milestone 116)", () => {
+    it("never lets two different executions' market evidence merge, even when both classify into the same industry", async () => {
+      const evidenceA = buildRankedSource({
+        id: "source_execution_a",
+        title: "Execution A's own distinctive source",
+        url: "https://execution-a-only.example.com",
+      });
+      const evidenceB = buildRankedSource({
+        id: "source_execution_b",
+        title: "Execution B's own distinctive source",
+        url: "https://execution-b-only.example.com",
+      });
+
+      // Both ideas contain "subscription" and "platform" — both keywords
+      // in industryClassifier.ts's own "saas" bucket — so, under the
+      // pre-Milestone-116 design, both would classify into the exact same
+      // global "saas" knowledge-base entry and merge each other's
+      // evidence. Two different, unrelated startup ideas that happen to
+      // share a classifier keyword.
+      runResearchMock.mockResolvedValue(buildResearchResult({ sources: [evidenceA] }));
+      const resultA = await decisionStage.run(
+        "A subscription platform for restaurant table reservations",
+        "execution-isolation-a"
+      );
+
+      runResearchMock.mockResolvedValue(buildResearchResult({ sources: [evidenceB] }));
+      const resultB = await decisionStage.run(
+        "A subscription platform for veterinary appointment booking",
+        "execution-isolation-b"
+      );
+
+      // Both really did classify the same way — otherwise this test
+      // wouldn't be exercising the contamination path at all.
+      expect(resultA.profile.marketProfile.industry).toBe("saas");
+      expect(resultB.profile.marketProfile.industry).toBe("saas");
+
+      const marketUrlsA = resultA.profile.marketProfile.sources.map((source) => source.url);
+      const marketUrlsB = resultB.profile.marketProfile.sources.map((source) => source.url);
+
+      expect(marketUrlsA).not.toContain("https://execution-b-only.example.com");
+      expect(marketUrlsB).not.toContain("https://execution-a-only.example.com");
+
+      expect(resultA.profile.marketProfile.analysisId).toBe("execution-isolation-a");
+      expect(resultB.profile.marketProfile.analysisId).toBe("execution-isolation-b");
+    });
+
+    it("never lets two different executions' competitors merge, even when discovery surfaces the same candidate name", async () => {
+      const sharedNameSource = buildRankedSource({ title: "Acme", url: "https://acme.com" });
+
+      runResearchMock.mockResolvedValue(buildResearchResult({ sources: [sharedNameSource] }));
+      const resultA = await decisionStage.run("An idea about Acme", "execution-competitor-a");
+
+      runResearchMock.mockResolvedValue(buildResearchResult({ sources: [sharedNameSource] }));
+      const resultB = await decisionStage.run("A different idea, also about Acme", "execution-competitor-b");
+
+      const idsA = resultA.profile.keyCompetitors.map((competitor) => competitor.id);
+      const idsB = resultB.profile.keyCompetitors.map((competitor) => competitor.id);
+
+      // Same candidate name discovered twice, in two unrelated
+      // executions, must resolve to two independent CompanyProfile
+      // records, never the same shared one.
+      for (const id of idsA) expect(idsB).not.toContain(id);
+
+      for (const competitor of resultA.profile.keyCompetitors) {
+        expect(competitor.analysisId).toBe("execution-competitor-a");
+      }
+      for (const competitor of resultB.profile.keyCompetitors) {
+        expect(competitor.analysisId).toBe("execution-competitor-b");
+      }
+    });
   });
 });

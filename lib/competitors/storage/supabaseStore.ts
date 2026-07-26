@@ -20,12 +20,14 @@ export class SupabaseCompetitorStore implements CompetitorKnowledgeStore {
     );
   }
 
-  async findByName(name: string): Promise<CompanyProfile | null> {
+  async findByName(name: string, analysisId: string): Promise<CompanyProfile | null> {
     void name;
+    void analysisId;
     throw new Error("SupabaseCompetitorStore.findByName is not implemented yet.");
   }
 
-  async list(): Promise<CompanyProfile[]> {
+  async list(analysisId: string): Promise<CompanyProfile[]> {
+    void analysisId;
     throw new Error("SupabaseCompetitorStore.list is not implemented yet.");
   }
 

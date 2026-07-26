@@ -59,7 +59,7 @@ describe("marketStage", () => {
   it("passes the startupIdea through to discoverMarket's request", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult());
 
-    const result = await marketStage.run("A subscription software platform for team scheduling");
+    const result = await marketStage.run("A subscription software platform for team scheduling", "execution-1");
 
     expect(result.request).toEqual({ startupIdea: "A subscription software platform for team scheduling" });
   });
@@ -67,7 +67,7 @@ describe("marketStage", () => {
   it("returns a real MarketProfile derived from the mocked research", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await marketStage.run("A subscription software platform for team scheduling");
+    const result = await marketStage.run("A subscription software platform for team scheduling", "execution-1");
 
     expect(result.profile.industry).toBeTruthy();
   });
@@ -77,7 +77,7 @@ describe("marketStage", () => {
       buildResearchResult({ sources: [buildRankedSource({ title: "Acme", url: "https://acme.com" })] })
     );
 
-    const result = await marketStage.run("An idea");
+    const result = await marketStage.run("An idea", "execution-1");
 
     expect(result.competitorCount).toBe(1);
   });
@@ -85,7 +85,7 @@ describe("marketStage", () => {
   it("returns competitorCount 0 when research finds no sources", async () => {
     runResearchMock.mockResolvedValue(buildResearchResult({ sources: [] }));
 
-    const result = await marketStage.run("An idea");
+    const result = await marketStage.run("An idea", "execution-1");
 
     expect(result.competitorCount).toBe(0);
   });
