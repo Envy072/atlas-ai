@@ -7,6 +7,7 @@ import {
   formatCurrencyUsd,
   formatRelativeTime,
   getBusinessSummaryHeadline,
+  getProjectSummaryFields,
 } from "@/lib/format";
 
 describe("formatScore", () => {
@@ -66,7 +67,11 @@ describe("formatPercent", () => {
 
 // The shared fallback chain extracted at Milestone 49 — previously
 // duplicated inline in app/projects/page.tsx, now also used by
-// ProjectComparisonView.
+// ProjectComparisonView and RecentProjectsPanel. Milestone 119 extends
+// the chain (rather than replacing it) with two more real, already-
+// persisted Decision Platform sources, since businessSummary's own
+// valueProposition/businessModel are honestly absent on every completed
+// analysis today.
 describe("getBusinessSummaryHeadline", () => {
   it("prefers valueProposition when present", () => {
     expect(getBusinessSummaryHeadline({ valueProposition: "A clear value prop.", businessModel: "SaaS" })).toBe(
@@ -78,8 +83,112 @@ describe("getBusinessSummaryHeadline", () => {
     expect(getBusinessSummaryHeadline({ businessModel: "Marketplace" })).toBe("Marketplace");
   });
 
-  it("falls back to an honest 'no summary' message when both are absent", () => {
+  it("falls back to the top key finding when businessSummary has neither field", () => {
+    expect(
+      getBusinessSummaryHeadline({}, [{ summary: "The market is growing." }, { summary: "A second finding." }])
+    ).toBe("The market is growing.");
+  });
+
+  it("falls back to the top positive investment argument when there are no key findings either", () => {
+    expect(
+      getBusinessSummaryHeadline({}, [], { positiveArguments: ["Demand is real.", "A second argument."] })
+    ).toBe("Demand is real.");
+  });
+
+  it("falls back to an honest 'no summary' message when nothing at all is available", () => {
     expect(getBusinessSummaryHeadline({})).toBe("No summary available.");
+  });
+
+  it("falls back to an honest 'no summary' message when findings/thesis are given but genuinely empty", () => {
+    expect(getBusinessSummaryHeadline({}, [], { positiveArguments: [] })).toBe("No summary available.");
+  });
+});
+
+// Milestone 119 — closes Private Beta Readiness Review Finding H1: the
+// Projects list showed "Not yet known." for every single project,
+// because businessSummary.customerProblem/valueProposition are always
+// absent (Business Intelligence's own competitive-positioning/health
+// scoring is still architecture-only). This atomically switches the
+// whole labeled pair — never mixing one real curated field with a
+// fallback for the other under the same "Problem"/"Solution" labels.
+describe("getProjectSummaryFields", () => {
+  it("shows the real curated Problem/Solution pair when BusinessSummary has both fields", () => {
+    const result = getProjectSummaryFields({
+      customerProblem: "Founders waste weeks on manual research.",
+      valueProposition: "Atlas AI compresses that into one conversation.",
+    });
+
+    expect(result).toEqual({
+      problemLabel: "Problem",
+      problemValue: "Founders waste weeks on manual research.",
+      solutionLabel: "Solution",
+      solutionValue: "Atlas AI compresses that into one conversation.",
+    });
+  });
+
+  it("falls back to the honestly-relabeled thesis/risk pair when only one curated field is present", () => {
+    const result = getProjectSummaryFields(
+      { customerProblem: "Founders waste weeks on manual research." },
+      { positiveArguments: ["The market is growing."] },
+      [{ summary: "A crowded competitive field." }]
+    );
+
+    expect(result.problemLabel).toBe("Strongest case");
+    expect(result.problemValue).toBe("The market is growing.");
+    expect(result.solutionLabel).toBe("Biggest risk");
+    expect(result.solutionValue).toBe("A crowded competitive field.");
+  });
+
+  it("falls back to the honestly-relabeled thesis/risk pair when both curated fields are absent (today's real case)", () => {
+    const result = getProjectSummaryFields(
+      {},
+      { positiveArguments: ["Existing subscriptions demonstrate appeal."] },
+      [{ summary: "Direct competition from established players." }]
+    );
+
+    expect(result).toEqual({
+      problemLabel: "Strongest case",
+      problemValue: "Existing subscriptions demonstrate appeal.",
+      solutionLabel: "Biggest risk",
+      solutionValue: "Direct competition from established players.",
+    });
+  });
+
+  it("falls back to an honest 'not yet known' when even the thesis/risk arrays are empty", () => {
+    const result = getProjectSummaryFields({}, { positiveArguments: [] }, []);
+
+    expect(result).toEqual({
+      problemLabel: "Strongest case",
+      problemValue: "Not yet known.",
+      solutionLabel: "Biggest risk",
+      solutionValue: "Not yet known.",
+    });
+  });
+
+  it("falls back to an honest 'not yet known' when investmentThesis/criticalRisks are omitted entirely", () => {
+    const result = getProjectSummaryFields({});
+
+    expect(result.problemValue).toBe("Not yet known.");
+    expect(result.solutionValue).toBe("Not yet known.");
+  });
+
+  it("derives each of several distinct projects' fields independently, with no shared state or cross-contamination", () => {
+    const projectA = getProjectSummaryFields({}, { positiveArguments: ["Idea A's own market is growing."] }, [
+      { summary: "Idea A's own biggest risk." },
+    ]);
+    const projectB = getProjectSummaryFields(
+      { customerProblem: "Idea B's own real problem.", valueProposition: "Idea B's own real solution." },
+      { positiveArguments: ["Idea B's own positive argument — must not leak into Idea A's result."] }
+    );
+
+    expect(projectA.problemValue).toBe("Idea A's own market is growing.");
+    expect(projectA.solutionValue).toBe("Idea A's own biggest risk.");
+    expect(projectB).toEqual({
+      problemLabel: "Problem",
+      problemValue: "Idea B's own real problem.",
+      solutionLabel: "Solution",
+      solutionValue: "Idea B's own real solution.",
+    });
   });
 });
 

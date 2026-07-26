@@ -48,18 +48,76 @@ export function formatPercent(value: number): string {
 }
 
 // A business summary may honestly have no valueProposition/businessModel
-// yet — never fabricated, always a real "not yet known" state. Reused
-// identically by the Projects list (app/projects/page.tsx) and the Idea
-// Comparison view (Milestone 49), so this exact fallback chain exists in
-// one place, not duplicated at each call site. Typed narrowly to just
-// the two fields actually read, rather than importing BusinessSummary
-// from lib/decision — this file stays a pure, dependency-free
-// formatting layer, never a consumer of a knowledge platform's schema.
-export function getBusinessSummaryHeadline(businessSummary: {
-  valueProposition?: string;
-  businessModel?: string;
-}): string {
-  return businessSummary.valueProposition ?? businessSummary.businessModel ?? "No summary available.";
+// yet — Business Intelligence's own competitive-positioning/health
+// scoring is still architecture-only (lib/business/positioning/
+// positioningSynthesis.ts, lib/business/profile/businessHealth.ts), so
+// customerProblem/valueProposition are never fabricated to fill this gap.
+// Milestone 119 extends this chain (rather than replacing it) to fall
+// back to the Decision Platform's own already-real, already-persisted
+// keyFindings/investmentThesis before giving up — every completed
+// analysis already has at least one real, evidence-backed finding or
+// argument, so "No summary available." should now only ever appear for
+// a genuinely empty/degenerate profile. Reused identically by the
+// Projects list (app/projects/page.tsx), the Idea Comparison view
+// (Milestone 49), and the dashboard's Recent Projects panel. Typed
+// narrowly to just the fields actually read, rather than importing
+// BusinessSummary/Finding/InvestmentThesis from lib/decision — this file
+// stays a pure, dependency-free formatting layer, never a consumer of a
+// knowledge platform's schema.
+export function getBusinessSummaryHeadline(
+  businessSummary: { valueProposition?: string; businessModel?: string },
+  keyFindings?: { summary: string }[],
+  investmentThesis?: { positiveArguments: string[] }
+): string {
+  return (
+    businessSummary.valueProposition ??
+    businessSummary.businessModel ??
+    keyFindings?.[0]?.summary ??
+    investmentThesis?.positiveArguments[0] ??
+    "No summary available."
+  );
+}
+
+export interface ProjectSummaryFields {
+  problemLabel: string;
+  problemValue: string;
+  solutionLabel: string;
+  solutionValue: string;
+}
+
+// The Projects list card's "Problem"/"Solution" pair (Milestone 119).
+// businessSummary.customerProblem/valueProposition are BusinessProfile's
+// own real, curated fields — shown as-is, atomically as a pair, whenever
+// BOTH are genuinely present (never mixing one real curated field with a
+// fallback for the other, which would pair unrelated concepts under the
+// same two labels). Today those two fields are always absent (see this
+// function's own doc comment above), so the atomic fallback is what
+// every completed analysis actually shows: the investment thesis's
+// strongest real positive argument, and the single highest-priority
+// critical risk — genuinely different content, so it gets a genuinely
+// different, honestly-relabeled pair of headers rather than "Problem"/
+// "Solution" pointing at data that was never about a problem or a
+// solution.
+export function getProjectSummaryFields(
+  businessSummary: { customerProblem?: string; valueProposition?: string },
+  investmentThesis?: { positiveArguments: string[] },
+  criticalRisks?: { summary: string }[]
+): ProjectSummaryFields {
+  if (businessSummary.customerProblem && businessSummary.valueProposition) {
+    return {
+      problemLabel: "Problem",
+      problemValue: businessSummary.customerProblem,
+      solutionLabel: "Solution",
+      solutionValue: businessSummary.valueProposition,
+    };
+  }
+
+  return {
+    problemLabel: "Strongest case",
+    problemValue: investmentThesis?.positiveArguments[0] ?? "Not yet known.",
+    solutionLabel: "Biggest risk",
+    solutionValue: criticalRisks?.[0]?.summary ?? "Not yet known.",
+  };
 }
 
 const compactUsdFormatter = new Intl.NumberFormat("en-US", {

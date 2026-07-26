@@ -74,8 +74,20 @@ export default function ProjectComparisonView({ left, right }: ProjectComparison
 
         <TableRow>
           <TableHead scope="row">Business Summary</TableHead>
-          <TableCell>{getBusinessSummaryHeadline(left.profile.businessSummary)}</TableCell>
-          <TableCell>{getBusinessSummaryHeadline(right.profile.businessSummary)}</TableCell>
+          <TableCell>
+            {getBusinessSummaryHeadline(
+              left.profile.businessSummary,
+              left.profile.keyFindings,
+              left.profile.investmentThesis
+            )}
+          </TableCell>
+          <TableCell>
+            {getBusinessSummaryHeadline(
+              right.profile.businessSummary,
+              right.profile.keyFindings,
+              right.profile.investmentThesis
+            )}
+          </TableCell>
         </TableRow>
 
         <TableRow>

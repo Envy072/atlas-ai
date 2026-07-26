@@ -3,20 +3,25 @@ import Link from "next/link";
 import { FolderKanban, SearchX } from "lucide-react";
 import { listProjects } from "@/lib/services/projects";
 import { getCurrentUser } from "@/lib/services/auth";
-import { formatPercent, getBusinessSummaryHeadline } from "@/lib/format";
+import { formatPercent, getBusinessSummaryHeadline, getProjectSummaryFields } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { H1, Small, Body } from "@/components/ui/typography";
 import EmptyState from "@/components/shared/EmptyState";
 
-// project.score/problem/solution (the old AnalysisResult-shaped fields)
-// have no equivalent in DecisionProfile — no numeric score is ever
-// fabricated anywhere in this codebase (MILESTONE_26_DESIGN.md Section
-// 6). "Confidence" is a real, data-quality figure from
-// confidenceSummary, honestly labeled as confidence, not a verdict;
-// customerProblem/valueProposition are BusinessSummary's real, optional
-// fields, each falling back to an honest "Not yet known" rather than a
-// blank space.
+// project.score (the old AnalysisResult-shaped field) has no equivalent
+// in DecisionProfile — no numeric score is ever fabricated anywhere in
+// this codebase (MILESTONE_26_DESIGN.md Section 6). "Confidence" is a
+// real, data-quality figure from confidenceSummary, honestly labeled as
+// confidence, not a verdict.
+//
+// Milestone 119 — getProjectSummaryFields() prefers BusinessSummary's
+// own real, optional customerProblem/valueProposition when both are
+// present, but Business Intelligence's competitive-positioning/health
+// scoring is still architecture-only today (see lib/format.ts's own doc
+// comment), so this always falls back to the Decision Platform's
+// already-real, already-persisted investment-thesis/critical-risk data
+// instead of a bare "Not yet known." on every single card.
 //
 // Already protected by middleware.ts (Milestone 27b) — this check
 // (Milestone 27c) supplies the real user id listProjects() now requires
@@ -88,7 +93,9 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
       ) : (
         <div className="grid gap-6">
           {projects.map((project) => {
-            const { businessSummary, confidenceSummary } = project.profile;
+            const { businessSummary, investmentThesis, keyFindings, criticalRisks, confidenceSummary } =
+              project.profile;
+            const summaryFields = getProjectSummaryFields(businessSummary, investmentThesis, criticalRisks);
 
             return (
               <Link key={project.id} href={`/projects/${project.id}`} className="block">
@@ -103,21 +110,19 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                     </Badge>
                   </div>
 
-                  <Body className="mb-6 text-muted-foreground">{getBusinessSummaryHeadline(businessSummary)}</Body>
+                  <Body className="mb-6 text-muted-foreground">
+                    {getBusinessSummaryHeadline(businessSummary, keyFindings, investmentThesis)}
+                  </Body>
 
                   <div className="grid gap-6 md:grid-cols-2">
                     <div>
-                      <Small className="mb-2 block text-muted-foreground">Problem</Small>
-                      <p className="leading-7 text-card-foreground">
-                        {businessSummary.customerProblem ?? "Not yet known."}
-                      </p>
+                      <Small className="mb-2 block text-muted-foreground">{summaryFields.problemLabel}</Small>
+                      <p className="leading-7 text-card-foreground">{summaryFields.problemValue}</p>
                     </div>
 
                     <div>
-                      <Small className="mb-2 block text-muted-foreground">Solution</Small>
-                      <p className="leading-7 text-card-foreground">
-                        {businessSummary.valueProposition ?? "Not yet known."}
-                      </p>
+                      <Small className="mb-2 block text-muted-foreground">{summaryFields.solutionLabel}</Small>
+                      <p className="leading-7 text-card-foreground">{summaryFields.solutionValue}</p>
                     </div>
                   </div>
                 </Card>

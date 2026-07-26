@@ -45,7 +45,7 @@ export default function RecentProjectsPanel({ projects }: RecentProjectsPanelPro
           />
         ) : (
           recent.map((project) => {
-            const { businessSummary, confidenceSummary } = project.profile;
+            const { businessSummary, keyFindings, investmentThesis, confidenceSummary } = project.profile;
 
             return (
               <Link
@@ -56,7 +56,7 @@ export default function RecentProjectsPanel({ projects }: RecentProjectsPanelPro
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-card-foreground">{project.title}</p>
                   <p className="mt-1 truncate text-sm text-muted-foreground">
-                    {getBusinessSummaryHeadline(businessSummary)}
+                    {getBusinessSummaryHeadline(businessSummary, keyFindings, investmentThesis)}
                   </p>
                 </div>
 
