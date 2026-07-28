@@ -1,4 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
+
+// Milestone 121 — every API route's own error path funnels through
+// jsonError(), the one deliberate manual Sentry capture point for
+// route handlers (see lib/api/response.ts's own comment: routes
+// already catch their own errors internally, so the throw never
+// reaches Next.js's own onRequestError hook). Mocked here so these
+// tests assert the real capture-or-not decision deterministically,
+// rather than relying on the SDK's own no-op-with-no-client behavior.
+const { captureExceptionMock } = vi.hoisted(() => ({ captureExceptionMock: vi.fn() }));
+vi.mock("@sentry/nextjs", () => ({ captureException: captureExceptionMock }));
+
 import { jsonSuccess, jsonError } from "@/lib/api/response";
 import { InvalidRequestError } from "@/lib/errors";
 
@@ -58,5 +69,29 @@ describe("jsonError", () => {
     expect(consoleErrorSpy).not.toHaveBeenCalled();
 
     consoleErrorSpy.mockRestore();
+  });
+
+  // Milestone 121 — production error monitoring.
+  describe("Sentry capture", () => {
+    it("reports an unexpected (non-AppError) error to Sentry", () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      captureExceptionMock.mockClear();
+
+      const error = new Error("some internal detail");
+      jsonError(error);
+
+      expect(captureExceptionMock).toHaveBeenCalledTimes(1);
+      expect(captureExceptionMock).toHaveBeenCalledWith(error);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it("never reports an AppError to Sentry — it's an expected, already-safe failure", () => {
+      captureExceptionMock.mockClear();
+
+      jsonError(new InvalidRequestError("Bad input."));
+
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+    });
   });
 });
