@@ -1,8 +1,25 @@
-import { describe, it, expect } from "vitest";
-import { resolveCompetitorKnowledge } from "@/lib/competitors/knowledge/competitorResolver";
+import { describe, it, expect, vi } from "vitest";
 import { MemoryCompetitorStore } from "@/lib/competitors/storage/memoryStore";
 import type { DiscoveredCompetitor } from "@/lib/competitors/schemas/discovery.schema";
 import type { CompanyProfile } from "@/lib/competitors/schemas/company.schema";
+
+// The default store is real Supabase-backed as of Milestone 125
+// (previously in-memory) — the one test below that omits its own store
+// ("defaults to the shared defaultCompetitorStore") reaches it
+// transitively through resolveCompetitorKnowledge's own default
+// parameter. Mocked at the factory level with a real
+// MemoryCompetitorStore underneath, mirroring
+// lib/services/analysisSessions.test.ts's own identical precedent for
+// lib/pipeline/storage/createStore — this file's subject is
+// resolveCompetitorKnowledge's own matching/merging logic, not
+// persistence.
+vi.mock("@/lib/competitors/storage/createStore", async () => {
+  const { MemoryCompetitorStore } = await import("@/lib/competitors/storage/memoryStore");
+  const store = new MemoryCompetitorStore();
+  return { createStore: () => store };
+});
+
+import { resolveCompetitorKnowledge } from "@/lib/competitors/knowledge/competitorResolver";
 
 function buildCandidate(overrides: Partial<DiscoveredCompetitor> = {}): DiscoveredCompetitor {
   return {

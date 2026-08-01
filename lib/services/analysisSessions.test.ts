@@ -35,6 +35,22 @@ vi.mock("@/lib/pipeline/storage/createStore", async () => {
   return { createStore: () => store };
 });
 
+// The market/competitor platforms' own default stores are real
+// Supabase-backed as of Milestone 125 — reached transitively through the
+// decision stage's own resolveMarketKnowledge/resolveCompetitorKnowledge
+// calls, same reasoning as the pipeline store mock above.
+vi.mock("@/lib/market/storage/createStore", async () => {
+  const { MemoryMarketStore } = await import("@/lib/market/storage/memoryStore");
+  const store = new MemoryMarketStore();
+  return { createStore: () => store };
+});
+
+vi.mock("@/lib/competitors/storage/createStore", async () => {
+  const { MemoryCompetitorStore } = await import("@/lib/competitors/storage/memoryStore");
+  const store = new MemoryCompetitorStore();
+  return { createStore: () => store };
+});
+
 import { createClient } from "@/lib/supabase/server";
 import {
   startAnalysisSession,

@@ -24,6 +24,25 @@ vi.mock("@/lib/research", async () => {
   return { ...actual, runResearch: runResearchMock };
 });
 
+// The default market/competitor stores are real Supabase-backed as of
+// Milestone 125 (previously in-memory) — a resumed/recovered execution's
+// decision stage reaches them transitively through synthesizeDecision's
+// own resolveMarketKnowledge/resolveCompetitorKnowledge calls. Mocked at
+// the factory level with a real MemoryMarketStore/MemoryCompetitorStore
+// underneath, mirroring lib/services/analysisSessions.test.ts's own
+// identical precedent for lib/pipeline/storage/createStore.
+vi.mock("@/lib/market/storage/createStore", async () => {
+  const { MemoryMarketStore } = await import("@/lib/market/storage/memoryStore");
+  const store = new MemoryMarketStore();
+  return { createStore: () => store };
+});
+
+vi.mock("@/lib/competitors/storage/createStore", async () => {
+  const { MemoryCompetitorStore } = await import("@/lib/competitors/storage/memoryStore");
+  const store = new MemoryCompetitorStore();
+  return { createStore: () => store };
+});
+
 afterEach(() => {
   runResearchMock.mockReset();
 });
