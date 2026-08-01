@@ -10,6 +10,11 @@ import { describe, it, expect, vi } from "vitest";
 const { captureExceptionMock } = vi.hoisted(() => ({ captureExceptionMock: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException: captureExceptionMock }));
 
+// Milestone 123 — same reasoning, for the analytics-layer capture
+// jsonError() now also makes.
+const { trackServerEventMock } = vi.hoisted(() => ({ trackServerEventMock: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/lib/analytics/server", () => ({ trackServerEvent: trackServerEventMock }));
+
 import { jsonSuccess, jsonError } from "@/lib/api/response";
 import { InvalidRequestError } from "@/lib/errors";
 
@@ -28,7 +33,7 @@ describe("jsonSuccess", () => {
 
 describe("jsonError", () => {
   it("exposes an AppError's own message and status as-is", async () => {
-    const response = jsonError(new InvalidRequestError("Bad input."));
+    const response = await jsonError(new InvalidRequestError("Bad input."));
     expect(response.status).toBe(400);
     // `code` is Milestone 45's own additive field — lets the client
     // (lib/http/apiClient.ts's ApiClientError) distinguish which
@@ -42,7 +47,7 @@ describe("jsonError", () => {
   it("replaces an unexpected error's message with the fallback, and logs the real one", async () => {
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const response = jsonError(new Error("some internal detail"), "Public fallback message.");
+    const response = await jsonError(new Error("some internal detail"), "Public fallback message.");
 
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: "Public fallback message." });
@@ -54,7 +59,7 @@ describe("jsonError", () => {
   it("uses jsonError's own default fallback message when none is provided", async () => {
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const response = jsonError(new Error("detail"));
+    const response = await jsonError(new Error("detail"));
 
     expect(await response.json()).toEqual({ error: "Something went wrong." });
 
@@ -64,7 +69,7 @@ describe("jsonError", () => {
   it("never logs an AppError (it's an expected, already-safe failure)", async () => {
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    jsonError(new InvalidRequestError("Bad input."));
+    await jsonError(new InvalidRequestError("Bad input."));
 
     expect(consoleErrorSpy).not.toHaveBeenCalled();
 
@@ -73,12 +78,12 @@ describe("jsonError", () => {
 
   // Milestone 121 — production error monitoring.
   describe("Sentry capture", () => {
-    it("reports an unexpected (non-AppError) error to Sentry", () => {
+    it("reports an unexpected (non-AppError) error to Sentry", async () => {
       const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       captureExceptionMock.mockClear();
 
       const error = new Error("some internal detail");
-      jsonError(error);
+      await jsonError(error);
 
       expect(captureExceptionMock).toHaveBeenCalledTimes(1);
       expect(captureExceptionMock).toHaveBeenCalledWith(error);
@@ -86,12 +91,35 @@ describe("jsonError", () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it("never reports an AppError to Sentry — it's an expected, already-safe failure", () => {
+    it("never reports an AppError to Sentry — it's an expected, already-safe failure", async () => {
       captureExceptionMock.mockClear();
 
-      jsonError(new InvalidRequestError("Bad input."));
+      await jsonError(new InvalidRequestError("Bad input."));
 
       expect(captureExceptionMock).not.toHaveBeenCalled();
+    });
+  });
+
+  // Milestone 123 — product analytics.
+  describe("analytics capture", () => {
+    it("reports an unexpected (non-AppError) error as UNEXPECTED_SERVER_ERROR", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      trackServerEventMock.mockClear();
+
+      await jsonError(new Error("some internal detail"));
+
+      expect(trackServerEventMock).toHaveBeenCalledTimes(1);
+      expect(trackServerEventMock).toHaveBeenCalledWith("unexpected_server_error", "server", { status: 500 });
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it("never reports an AppError as an analytics event — it's an expected, already-safe failure", async () => {
+      trackServerEventMock.mockClear();
+
+      await jsonError(new InvalidRequestError("Bad input."));
+
+      expect(trackServerEventMock).not.toHaveBeenCalled();
     });
   });
 });

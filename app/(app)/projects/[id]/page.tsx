@@ -5,6 +5,8 @@ import { getCurrentUser } from "@/lib/services/auth";
 import { getProjectById } from "@/lib/services/projects";
 import { isDecisionStale } from "@/lib/decision";
 import { formatRelativeTime } from "@/lib/format";
+import { trackServerEvent } from "@/lib/analytics/server";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { H1, Small } from "@/components/ui/typography";
 import DecisionReport from "@/components/workspace/decision-report/DecisionReport";
 import DecisionArtifactLinks from "@/components/workspace/decision-report/DecisionArtifactLinks";
@@ -65,6 +67,14 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
   if (!project) {
     notFound();
   }
+
+  // Milestone 123 — fired only past the ownership/existence checks
+  // above, so a guessed/enumerated id (this route's own established
+  // "notFound() for all three alike" convention, this file's own top
+  // comment) never generates a "viewed" event for content the visitor
+  // never actually saw. project_id is a random identifier, never the
+  // startup idea text this project is named after.
+  await trackServerEvent(ANALYTICS_EVENTS.PROJECT_OPENED, user.id, { project_id: project.id });
 
   const verdict = project.decisionArtifacts?.verdict;
   const now = new Date();

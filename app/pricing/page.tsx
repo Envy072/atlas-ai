@@ -3,6 +3,8 @@ import { Check, CheckCircle2 } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import { getCurrentUser } from "@/lib/services/auth";
 import { getUserTier } from "@/lib/services/stripe";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import AnalyticsLink from "@/components/shared/AnalyticsLink";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { H2, H3, Display, Body, Small, Caption } from "@/components/ui/typography";
@@ -135,7 +137,15 @@ export default async function PricingPage() {
                     <Caption className="text-center">Payment link coming soon.</Caption>
                   </div>
                 ) : user ? (
-                  <Button className="w-full" render={<Link href={buildFounderCheckoutUrl(FOUNDER_PAYMENT_LINK_URL, user.id)} />}>
+                  <Button
+                    className="w-full"
+                    render={
+                      <AnalyticsLink
+                        href={buildFounderCheckoutUrl(FOUNDER_PAYMENT_LINK_URL, user.id)}
+                        event={ANALYTICS_EVENTS.CHECKOUT_STARTED}
+                      />
+                    }
+                  >
                     Get Founder
                   </Button>
                 ) : (

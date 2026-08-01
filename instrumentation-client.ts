@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
+import { initAnalytics } from "@/lib/analytics/client";
 
 // Milestone 121 — the browser counterpart to instrumentation.ts's
 // register(). Next.js's own native client instrumentation convention
@@ -14,3 +15,9 @@ import * as Sentry from "@sentry/nextjs";
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 });
+
+// Milestone 123 — the same file's second, independent "monitoring,
+// analytics code... that runs before your app becomes interactive"
+// (this convention's own documented purpose covers both). Key-optional,
+// same standard: see lib/analytics/client.ts's own comment.
+initAnalytics();

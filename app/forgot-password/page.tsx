@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { trackEvent } from "@/lib/analytics/client";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -52,6 +54,11 @@ export default function ForgotPasswordPage() {
       return;
     }
 
+    // Fires identically for a known and an unknown email — mirroring
+    // resetPasswordForEmail()'s own enumeration-resistant behavior
+    // above, so this event can never become a second, analytics-shaped
+    // way to learn whether an address has an account.
+    trackEvent(ANALYTICS_EVENTS.PASSWORD_RESET_REQUESTED);
     setSubmitted(true);
   }
 

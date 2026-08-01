@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getSafeRedirectPath } from "@/lib/format";
+import { trackEvent, identifyUser } from "@/lib/analytics/client";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -50,6 +52,19 @@ function SignupForm() {
     if (error) {
       setError(error.message);
       return;
+    }
+
+    // Fires once the account genuinely exists, regardless of whether
+    // email confirmation is required before the founder can sign in —
+    // "did the founder complete our signup flow" is the meaningful
+    // product event, not "do they have an active session right now."
+    // identifyUser() links any prior anonymous activity (e.g. an
+    // anonymous analysis run before signup, Milestone 27's own approved
+    // product decision) to this real identity — by user id only, never
+    // the email address.
+    if (data.user) {
+      trackEvent(ANALYTICS_EVENTS.SIGNUP_COMPLETED);
+      identifyUser(data.user.id);
     }
 
     // Whether this account can sign in immediately or needs email

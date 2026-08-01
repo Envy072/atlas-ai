@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { isPasswordRecoveryLinkError, getPasswordResetValidationError } from "@/lib/format";
+import { trackEvent, identifyUser } from "@/lib/analytics/client";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -121,13 +123,16 @@ function ResetPasswordForm() {
     setLoading(true);
     setFormError(null);
 
-    const { error } = await supabase.auth.updateUser({ password });
+    const { data, error } = await supabase.auth.updateUser({ password });
 
     if (error) {
       setLoading(false);
       setFormError(error.message);
       return;
     }
+
+    trackEvent(ANALYTICS_EVENTS.PASSWORD_RESET_COMPLETED);
+    if (data.user) identifyUser(data.user.id);
 
     // Signs out the one-time recovery session deliberately, rather than
     // leaving it active: the person who clicked the link only proved

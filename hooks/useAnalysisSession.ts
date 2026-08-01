@@ -9,6 +9,8 @@ import { AnalysisSessionViewSchema } from "@/lib/schemas/analysisSessionView";
 import type { AnalysisSessionView } from "@/lib/schemas/analysisSessionView";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import type { SessionState } from "@/lib/analysis-session";
+import { trackEvent } from "@/lib/analytics/client";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 const POLL_INTERVAL_MS = 1750;
 
@@ -24,6 +26,22 @@ const TERMINAL_STATES = new Set<SessionState>(["completed", "cancelled", "failed
 // re-deriving their own copy of Session's terminal-state set.
 export function isTerminalSessionState(state: SessionState): boolean {
   return TERMINAL_STATES.has(state);
+}
+
+// Milestone 123 — the one place a terminal Session state becomes a
+// product event, called from every code path that can observe one
+// (poll()'s own recurring response, cancel()'s immediate response, and
+// start()'s own initial response in the rare case an analysis is
+// already terminal on its very first response) — never duplicated as
+// three separate switch statements. Deliberately does NOT fire for a
+// caught fetch/network exception in any of this hook's own catch
+// blocks below: those are a different failure class (this hook's own
+// call to our API broke) from "the AI pipeline itself reached state:
+// failed" — the latter is what ANALYSIS_FAILED means here.
+function trackTerminalState(state: SessionState): void {
+  if (state === "completed") trackEvent(ANALYTICS_EVENTS.ANALYSIS_COMPLETED);
+  else if (state === "failed") trackEvent(ANALYTICS_EVENTS.ANALYSIS_FAILED);
+  else if (state === "cancelled") trackEvent(ANALYTICS_EVENTS.ANALYSIS_CANCELLED);
 }
 
 interface UseAnalysisSessionResult {
@@ -90,7 +108,9 @@ export function useAnalysisSession(): UseAnalysisSessionResult {
         const parsed = parseView(data);
         setView(parsed);
 
-        if (!isTerminalSessionState(parsed.session.state)) {
+        if (isTerminalSessionState(parsed.session.state)) {
+          trackTerminalState(parsed.session.state);
+        } else {
           timerRef.current = setTimeout(() => pollRef.current(id), POLL_INTERVAL_MS);
         }
       } catch (err) {
@@ -117,11 +137,19 @@ export function useAnalysisSession(): UseAnalysisSessionResult {
         const data = await postJSON<unknown>("/api/analysis-sessions", { startupIdea, title });
         const parsed = parseView(data);
 
+        // Fires as soon as the request succeeds, regardless of what the
+        // session's own first observed state is — "did the founder
+        // successfully submit an idea" is the meaningful event, distinct
+        // from whatever happens to it next.
+        trackEvent(ANALYTICS_EVENTS.ANALYSIS_STARTED);
+
         setSessionId(parsed.session.id);
         setView(parsed);
         setStatus("polling");
 
-        if (!isTerminalSessionState(parsed.session.state)) {
+        if (isTerminalSessionState(parsed.session.state)) {
+          trackTerminalState(parsed.session.state);
+        } else {
           timerRef.current = setTimeout(() => poll(parsed.session.id), POLL_INTERVAL_MS);
         }
       } catch (err) {
@@ -141,7 +169,9 @@ export function useAnalysisSession(): UseAnalysisSessionResult {
       const parsed = parseView(data);
       setView(parsed);
 
-      if (!isTerminalSessionState(parsed.session.state)) {
+      if (isTerminalSessionState(parsed.session.state)) {
+        trackTerminalState(parsed.session.state);
+      } else {
         timerRef.current = setTimeout(() => poll(sessionId), POLL_INTERVAL_MS);
       }
     } catch (err) {

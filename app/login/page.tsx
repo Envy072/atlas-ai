@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { getSafeRedirectPath } from "@/lib/format";
+import { trackEvent, identifyUser } from "@/lib/analytics/client";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -61,13 +63,20 @@ function LoginForm() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     setLoading(false);
 
     if (error) {
       setError(error.message);
       return;
+    }
+
+    // identifyUser() by user id only, never the email address (this
+    // file's own form value, never sent as an event property).
+    if (data.user) {
+      trackEvent(ANALYTICS_EVENTS.LOGIN_COMPLETED);
+      identifyUser(data.user.id);
     }
 
     // getSafeRedirectPath rejects anything that isn't a genuine,

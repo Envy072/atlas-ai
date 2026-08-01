@@ -5,6 +5,8 @@ import { getCurrentUser } from "@/lib/services/auth";
 import { getProjectById } from "@/lib/services/projects";
 import { getUserTier } from "@/lib/services/stripe";
 import { buildInvestmentMemo } from "@/lib/decision";
+import { trackServerEvent } from "@/lib/analytics/server";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { H1, H2, Body } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,6 +76,11 @@ export default async function InvestmentMemoPage({ params }: InvestmentMemoPageP
       </div>
     );
   }
+
+  // Milestone 123 — fired only past the tier gate above, so this event
+  // means the real memo was actually shown, never the upgrade-prompt
+  // card in its place.
+  await trackServerEvent(ANALYTICS_EVENTS.INVESTMENT_MEMO_VIEWED, user.id, { project_id: project.id });
 
   const memo = buildInvestmentMemo(
     project.profile,

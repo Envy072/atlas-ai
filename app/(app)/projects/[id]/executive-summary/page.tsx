@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/services/auth";
 import { getProjectById } from "@/lib/services/projects";
 import { buildExecutiveSummary } from "@/lib/decision";
+import { trackServerEvent } from "@/lib/analytics/server";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { H1 } from "@/components/ui/typography";
 import ExecutiveSummaryView from "@/components/workspace/decision-report/ExecutiveSummaryView";
 
@@ -32,6 +34,11 @@ export default async function ExecutiveSummaryPage({ params }: ExecutiveSummaryP
   if (!project) {
     notFound();
   }
+
+  // Milestone 123 — fired only past the ownership/existence check
+  // above, mirroring app/projects/[id]/page.tsx's own identical
+  // reasoning.
+  await trackServerEvent(ANALYTICS_EVENTS.EXECUTIVE_SUMMARY_VIEWED, user.id, { project_id: project.id });
 
   const summary = buildExecutiveSummary(project.profile);
 

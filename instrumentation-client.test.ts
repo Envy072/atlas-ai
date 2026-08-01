@@ -6,11 +6,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const { initMock } = vi.hoisted(() => ({ initMock: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ init: initMock }));
 
+// Milestone 123 — same reasoning, for the second independent
+// initializer this file now calls.
+const { initAnalyticsMock } = vi.hoisted(() => ({ initAnalyticsMock: vi.fn() }));
+vi.mock("@/lib/analytics/client", () => ({ initAnalytics: initAnalyticsMock }));
+
 describe("instrumentation-client", () => {
   const originalDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 
   beforeEach(() => {
     initMock.mockClear();
+    initAnalyticsMock.mockClear();
     vi.resetModules();
   });
 
@@ -35,5 +41,11 @@ describe("instrumentation-client", () => {
 
     await expect(import("@/instrumentation-client")).resolves.toBeDefined();
     expect(initMock).toHaveBeenCalledWith({ dsn: undefined });
+  });
+
+  it("also initializes analytics as soon as the module is imported", async () => {
+    await import("@/instrumentation-client");
+
+    expect(initAnalyticsMock).toHaveBeenCalledTimes(1);
   });
 });

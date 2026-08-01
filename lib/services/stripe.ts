@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { WebhookVerificationError, ExternalServiceError, InvalidRequestError } from "@/lib/errors";
 import type { SubscriptionTier, SubscriptionStatus } from "@/lib/schemas/subscription";
+import { trackServerEvent } from "@/lib/analytics/server";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 // The pricing page's own "2 analyses per month" Free tier copy
 // (app/pricing/page.tsx) — a real, adjustable policy value, not a
@@ -125,6 +127,15 @@ export async function handleCheckoutSessionCompleted(event: Stripe.Event): Promi
   if (error) {
     throw new ExternalServiceError("Supabase", "Could not activate the Founder subscription.");
   }
+
+  // Milestone 123 — `uuid: event.id` is Stripe's own webhook event id,
+  // passed through as PostHog's own native event-deduplication key
+  // (posthog-node's EventMessage.uuid). This function's own upsert
+  // above is already redelivery-safe at the database layer (the
+  // comment right above it); this is the analytics-layer equivalent of
+  // that same guarantee — a redelivered event is recorded once, not
+  // once per delivery attempt.
+  await trackServerEvent(ANALYTICS_EVENTS.CHECKOUT_COMPLETED, userId, undefined, event.id);
 }
 
 // Fires on renewal, plan changes, or a status change (e.g. a failed

@@ -5,6 +5,8 @@ import { getCurrentUser } from "@/lib/services/auth";
 import { getProjectById } from "@/lib/services/projects";
 import { getUserTier } from "@/lib/services/stripe";
 import { buildDueDiligenceReport } from "@/lib/decision";
+import { trackServerEvent } from "@/lib/analytics/server";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { H1, H2, Body } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,6 +64,10 @@ export default async function DueDiligenceReportPage({ params }: DueDiligenceRep
       </div>
     );
   }
+
+  // Milestone 123 — fired only past the tier gate above, mirroring
+  // memo/page.tsx's own identical reasoning.
+  await trackServerEvent(ANALYTICS_EVENTS.DUE_DILIGENCE_VIEWED, user.id, { project_id: project.id });
 
   const report = buildDueDiligenceReport(project.profile);
 
