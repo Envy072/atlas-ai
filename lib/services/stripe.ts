@@ -136,6 +136,10 @@ export async function handleCheckoutSessionCompleted(event: Stripe.Event): Promi
   // that same guarantee — a redelivered event is recorded once, not
   // once per delivery attempt.
   await trackServerEvent(ANALYTICS_EVENTS.CHECKOUT_COMPLETED, userId, undefined, event.id);
+  // Milestone: Stripe Webhooks — the subscription-lifecycle counterpart
+  // to CHECKOUT_COMPLETED's own funnel-completion event (see
+  // events.ts's own comment on the distinction). Same dedup uuid.
+  await trackServerEvent(ANALYTICS_EVENTS.SUBSCRIPTION_STARTED, userId, undefined, event.id);
 }
 
 // Fires on renewal, plan changes, or a status change (e.g. a failed
@@ -166,22 +170,45 @@ export async function handleSubscriptionUpdated(event: Stripe.Event): Promise<vo
     return;
   }
 
+  const mappedStatus = toSubscriptionStatus(subscription.status);
+
   const { error } = await supabase
     .from("subscriptions")
-    .update({ status: toSubscriptionStatus(subscription.status), updated_at: new Date().toISOString() })
+    .update({ status: mappedStatus, updated_at: new Date().toISOString() })
     .eq("stripe_subscription_id", subscription.id);
 
   if (error) {
     throw new ExternalServiceError("Supabase", "Could not update the subscription status.");
   }
+
+  await trackServerEvent(ANALYTICS_EVENTS.SUBSCRIPTION_UPDATED, data.user_id, { status: mappedStatus }, event.id);
 }
 
 // Fires when a subscription is fully canceled/ended — mirrors
-// handleSubscriptionUpdated's own "no matching row, nothing to do"
-// handling exactly.
+// handleSubscriptionUpdated's own "select first, then update, no
+// matching row means nothing to do" shape exactly (this function
+// previously updated blindly with no select; brought in line with its
+// sibling both for the same defensive "don't silently no-op an
+// unmatched update" reasoning, and because the analytics call below
+// needs the row's own user_id).
 export async function handleSubscriptionDeleted(event: Stripe.Event): Promise<void> {
   const subscription = event.data.object as Stripe.Subscription;
   const supabase = createAdminClient();
+
+  const { data, error: selectError } = await supabase
+    .from("subscriptions")
+    .select("user_id")
+    .eq("stripe_subscription_id", subscription.id)
+    .maybeSingle();
+
+  if (selectError) {
+    throw new ExternalServiceError("Supabase", "Could not look up the subscription to cancel.");
+  }
+
+  if (!data) {
+    console.error("Stripe webhook: customer.subscription.deleted for an unknown subscription", subscription.id);
+    return;
+  }
 
   const { error } = await supabase
     .from("subscriptions")
@@ -191,6 +218,59 @@ export async function handleSubscriptionDeleted(event: Stripe.Event): Promise<vo
   if (error) {
     throw new ExternalServiceError("Supabase", "Could not cancel the subscription.");
   }
+
+  await trackServerEvent(ANALYTICS_EVENTS.SUBSCRIPTION_CANCELLED, data.user_id, undefined, event.id);
+}
+
+// Fires when a subscription renewal invoice fails to charge — Stripe's
+// own retry schedule (Smart Retries) will attempt the charge again
+// before eventually emitting customer.subscription.deleted if every
+// retry fails, so this handler only reflects the immediate "payment
+// trouble" state (mirrors toSubscriptionStatus's own past_due mapping
+// for incomplete/unpaid) rather than canceling anything itself.
+//
+// As of this SDK's pinned API version (stripe@22.3.2 — confirmed
+// directly against the installed package's own type definitions, not
+// assumed from an older shape), an Invoice no longer carries a
+// top-level `subscription` field; the owning subscription is reached
+// via `invoice.parent.subscription_details.subscription` instead.
+export async function handleInvoicePaymentFailed(event: Stripe.Event): Promise<void> {
+  const invoice = event.data.object as Stripe.Invoice;
+  const subscriptionRef = invoice.parent?.subscription_details?.subscription;
+  const subscriptionId = typeof subscriptionRef === "string" ? subscriptionRef : subscriptionRef?.id;
+
+  if (!subscriptionId) {
+    console.error("Stripe webhook: invoice.payment_failed with no subscription reference", invoice.id);
+    return;
+  }
+
+  const supabase = createAdminClient();
+
+  const { data, error: selectError } = await supabase
+    .from("subscriptions")
+    .select("user_id")
+    .eq("stripe_subscription_id", subscriptionId)
+    .maybeSingle();
+
+  if (selectError) {
+    throw new ExternalServiceError("Supabase", "Could not look up the subscription for a failed payment.");
+  }
+
+  if (!data) {
+    console.error("Stripe webhook: invoice.payment_failed for an unknown subscription", subscriptionId);
+    return;
+  }
+
+  const { error } = await supabase
+    .from("subscriptions")
+    .update({ status: "past_due", updated_at: new Date().toISOString() })
+    .eq("stripe_subscription_id", subscriptionId);
+
+  if (error) {
+    throw new ExternalServiceError("Supabase", "Could not mark the subscription as past_due.");
+  }
+
+  await trackServerEvent(ANALYTICS_EVENTS.SUBSCRIPTION_PAYMENT_FAILED, data.user_id, undefined, event.id);
 }
 
 // The one read path every enforcement point calls

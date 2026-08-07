@@ -10,6 +10,13 @@ import type Stripe from "stripe";
 vi.mock("stripe", () => ({ default: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 
+// Mirrors lib/api/response.test.ts's own established Sentry-mocking
+// pattern: mocked here (rather than left real/DSN-optional-no-op) so
+// this file's own new Sentry-capture tests can assert the real
+// capture-or-not decision deterministically.
+const { captureExceptionMock } = vi.hoisted(() => ({ captureExceptionMock: vi.fn() }));
+vi.mock("@sentry/nextjs", () => ({ captureException: captureExceptionMock }));
+
 import StripeSdk from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { POST } from "@/app/api/webhooks/stripe/route";
@@ -42,6 +49,7 @@ beforeEach(() => {
 afterEach(() => {
   mockedStripeSdk.mockReset();
   mockedCreateAdminClient.mockReset();
+  captureExceptionMock.mockClear();
   vi.unstubAllEnvs();
 });
 
@@ -73,7 +81,35 @@ describe("POST /api/webhooks/stripe", () => {
     );
   });
 
-  it("rejects an invalid signature with 400, before any database call is attempted", async () => {
+  it("golden path: a validly-signed invoice.payment_failed marks the subscription past_due", async () => {
+    mockStripeConstructor(
+      () =>
+        ({
+          type: "invoice.payment_failed",
+          data: {
+            object: {
+              id: "in_test_1",
+              customer: "cus_test_1",
+              parent: { subscription_details: { subscription: "sub_test_1" } },
+            },
+          },
+        }) as unknown as Stripe.Event
+    );
+    const maybeSingle = vi.fn(() => Promise.resolve({ data: { user_id: "user-1" }, error: null }));
+    const selectEq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq: selectEq }));
+    const updateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const update = vi.fn(() => ({ eq: updateEq }));
+    mockedCreateAdminClient.mockReturnValue({ from: vi.fn(() => ({ select, update })) } as never);
+
+    const response = await POST(buildRequest("{}", "valid-signature"));
+
+    expect(response.status).toBe(200);
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: "past_due" }));
+    expect(updateEq).toHaveBeenCalledWith("stripe_subscription_id", "sub_test_1");
+  });
+
+  it("rejects an invalid signature with 400, before any database call is attempted, and does not alert Sentry (an expected, routine rejection)", async () => {
     mockStripeConstructor(() => {
       throw new Error("No signatures found matching the expected signature for payload.");
     });
@@ -82,6 +118,7 @@ describe("POST /api/webhooks/stripe", () => {
 
     expect(response.status).toBe(400);
     expect(mockedCreateAdminClient).not.toHaveBeenCalled();
+    expect(captureExceptionMock).not.toHaveBeenCalled();
   });
 
   it("acknowledges (200) an event type it doesn't handle, without touching the database", async () => {
@@ -93,5 +130,29 @@ describe("POST /api/webhooks/stripe", () => {
 
     expect(response.status).toBe(200);
     expect(mockedCreateAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("reports a genuine handler failure (e.g. a Supabase write error) to Sentry and returns a retryable status, unlike a routine signature rejection", async () => {
+    mockStripeConstructor(
+      () =>
+        ({
+          type: "checkout.session.completed",
+          data: {
+            object: {
+              id: "cs_test_1",
+              client_reference_id: "user-1",
+              customer: "cus_test_1",
+              subscription: "sub_test_1",
+            },
+          },
+        }) as unknown as Stripe.Event
+    );
+    const upsert = vi.fn(() => Promise.resolve({ error: { message: "connection lost" } }));
+    mockedCreateAdminClient.mockReturnValue({ from: vi.fn(() => ({ upsert })) } as never);
+
+    const response = await POST(buildRequest("{}", "valid-signature"));
+
+    expect(response.status).toBe(502);
+    expect(captureExceptionMock).toHaveBeenCalledTimes(1);
   });
 });

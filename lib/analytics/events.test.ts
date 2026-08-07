@@ -20,6 +20,10 @@ describe("ANALYTICS_EVENTS", () => {
         "due_diligence_viewed",
         "checkout_started",
         "checkout_completed",
+        "subscription_started",
+        "subscription_updated",
+        "subscription_cancelled",
+        "subscription_payment_failed",
         "unexpected_client_error",
         "unexpected_server_error",
       ].sort()

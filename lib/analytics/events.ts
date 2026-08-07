@@ -43,6 +43,17 @@ export const ANALYTICS_EVENTS = {
   // Billing
   CHECKOUT_STARTED: "checkout_started",
   CHECKOUT_COMPLETED: "checkout_completed",
+  // Milestone: Stripe Webhooks. Distinct from CHECKOUT_COMPLETED (a
+  // funnel event — "the founder finished the Payment Link flow") —
+  // these four track the subscription's own lifecycle as Stripe's
+  // webhooks report it, one per handled event type in
+  // lib/services/stripe.ts, so product/ops can see renewals, plan
+  // changes, cancellations, and payment failures as they happen, not
+  // just the initial purchase.
+  SUBSCRIPTION_STARTED: "subscription_started",
+  SUBSCRIPTION_UPDATED: "subscription_updated",
+  SUBSCRIPTION_CANCELLED: "subscription_cancelled",
+  SUBSCRIPTION_PAYMENT_FAILED: "subscription_payment_failed",
 
   // Errors — deliberately separate from Milestone 121's Sentry capture:
   // same two moments (jsonError()'s unexpected-error branch, the three

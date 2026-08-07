@@ -21,6 +21,7 @@ import {
   handleCheckoutSessionCompleted,
   handleSubscriptionUpdated,
   handleSubscriptionDeleted,
+  handleInvoicePaymentFailed,
   getUserTier,
   getSubscriptionDetails,
   createBillingPortalUrl,
@@ -112,6 +113,25 @@ function buildSubscriptionEvent(type: string, overrides: Partial<Stripe.Subscrip
         id: "sub_test_1",
         status: "active",
         customer: "cus_test_1",
+        ...overrides,
+      },
+    },
+  } as unknown as Stripe.Event;
+}
+
+// The installed SDK's own pinned API version (stripe@22.3.2, confirmed
+// directly against its type definitions) reaches an invoice's owning
+// subscription via parent.subscription_details.subscription, not a
+// top-level `subscription` field — this fixture matches that real
+// shape, not an older/assumed one.
+function buildInvoicePaymentFailedEvent(overrides: Partial<Stripe.Invoice> = {}): Stripe.Event {
+  return {
+    type: "invoice.payment_failed",
+    data: {
+      object: {
+        id: "in_test_1",
+        customer: "cus_test_1",
+        parent: { subscription_details: { subscription: "sub_test_1" } },
         ...overrides,
       },
     },
@@ -239,15 +259,97 @@ describe("handleSubscriptionUpdated", () => {
 
 describe("handleSubscriptionDeleted", () => {
   it("sets status to canceled for the matching subscription id", async () => {
-    const client = createMockAdminClient();
+    const client = createMockAdminClient({ selectResult: { data: { user_id: "user-1" }, error: null } });
     mockedCreateAdminClient.mockReturnValue(client as never);
 
     await handleSubscriptionDeleted(buildSubscriptionEvent("customer.subscription.deleted"));
 
-    const fromReturn = vi.mocked(client.from).mock.results[0]?.value;
+    const fromReturn = vi.mocked(client.from).mock.results[1]?.value;
     expect(fromReturn.update).toHaveBeenCalledWith(expect.objectContaining({ status: "canceled" }));
     const updateReturn = vi.mocked(fromReturn.update).mock.results[0]?.value;
     expect(updateReturn.eq).toHaveBeenCalledWith("stripe_subscription_id", "sub_test_1");
+  });
+
+  it("logs and no-ops when no row matches this subscription id", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const client = createMockAdminClient({ selectResult: { data: null, error: null } });
+    mockedCreateAdminClient.mockReturnValue(client as never);
+
+    await handleSubscriptionDeleted(buildSubscriptionEvent("customer.subscription.deleted"));
+
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("throws ExternalServiceError when the update itself fails", async () => {
+    const client = createMockAdminClient({
+      selectResult: { data: { user_id: "user-1" }, error: null },
+      updateResult: { error: { message: "connection lost" } },
+    });
+    mockedCreateAdminClient.mockReturnValue(client as never);
+
+    await expect(handleSubscriptionDeleted(buildSubscriptionEvent("customer.subscription.deleted"))).rejects.toThrow(
+      "Could not cancel the subscription."
+    );
+  });
+});
+
+describe("handleInvoicePaymentFailed", () => {
+  it("sets status to past_due for the invoice's own subscription", async () => {
+    const client = createMockAdminClient({ selectResult: { data: { user_id: "user-1" }, error: null } });
+    mockedCreateAdminClient.mockReturnValue(client as never);
+
+    await handleInvoicePaymentFailed(buildInvoicePaymentFailedEvent());
+
+    const fromReturn = vi.mocked(client.from).mock.results[1]?.value;
+    expect(fromReturn.update).toHaveBeenCalledWith(expect.objectContaining({ status: "past_due" }));
+    const updateReturn = vi.mocked(fromReturn.update).mock.results[0]?.value;
+    expect(updateReturn.eq).toHaveBeenCalledWith("stripe_subscription_id", "sub_test_1");
+  });
+
+  it("logs and no-ops (never calls the database) when the invoice has no subscription reference", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const client = createMockAdminClient();
+    mockedCreateAdminClient.mockReturnValue(client as never);
+
+    await handleInvoicePaymentFailed(buildInvoicePaymentFailedEvent({ parent: null }));
+
+    expect(client.from).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("logs and no-ops when no row matches the invoice's subscription id", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const client = createMockAdminClient({ selectResult: { data: null, error: null } });
+    mockedCreateAdminClient.mockReturnValue(client as never);
+
+    await handleInvoicePaymentFailed(buildInvoicePaymentFailedEvent());
+
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("throws ExternalServiceError when the lookup itself fails", async () => {
+    const client = createMockAdminClient({ selectResult: { data: null, error: { message: "connection lost" } } });
+    mockedCreateAdminClient.mockReturnValue(client as never);
+
+    await expect(handleInvoicePaymentFailed(buildInvoicePaymentFailedEvent())).rejects.toThrow(
+      "Could not look up the subscription for a failed payment."
+    );
+  });
+
+  it("throws ExternalServiceError when the update itself fails", async () => {
+    const client = createMockAdminClient({
+      selectResult: { data: { user_id: "user-1" }, error: null },
+      updateResult: { error: { message: "connection lost" } },
+    });
+    mockedCreateAdminClient.mockReturnValue(client as never);
+
+    await expect(handleInvoicePaymentFailed(buildInvoicePaymentFailedEvent())).rejects.toThrow(
+      "Could not mark the subscription as past_due."
+    );
   });
 });
 
