@@ -178,6 +178,15 @@ async function executeStageWithRetry<TResult>(
       attempt,
     });
 
+    // TEMPORARY — Milestone 127 timeout investigation, remove after root
+    // cause is confirmed. Fires synchronously before this stage's async
+    // work begins, so the last STARTED line with no matching COMPLETED
+    // line after it identifies the stage in progress when the platform
+    // kills the request.
+    console.log(
+      `[PIPELINE_TIMING] stage=${stage.name} event=started attempt=${attempt} executionId=${current.id}`
+    );
+
     let result: TResult;
     try {
       // Milestone 116 — current.id (this execution's own id) is passed
@@ -263,6 +272,14 @@ async function executeStageWithRetry<TResult>(
 
     const finishedAt = new Date();
     const durationMs = finishedAt.getTime() - startedAt.getTime();
+
+    // TEMPORARY — Milestone 127 timeout investigation, remove after root
+    // cause is confirmed. durationMs is already computed above for
+    // succeededRecord; this only logs it.
+    console.log(
+      `[PIPELINE_TIMING] stage=${stage.name} event=completed attempt=${attempt} executionId=${current.id} durationMs=${durationMs}`
+    );
+
     const succeededRecord: StageRecord = {
       stage: stage.name,
       attempt,

@@ -47,6 +47,14 @@ export const maxDuration = 60;
 // the Milestone 46 review named. Checked before the monthly usage-limit
 // query, cheapest-check-first.
 export async function POST(req: Request) {
+  // TEMPORARY — Milestone 127 timeout investigation, remove after root
+  // cause is confirmed. Booleans only, never values — confirms whether
+  // every provider/AI credential this pipeline needs is actually
+  // present in this deployment before a single external call is made.
+  console.log(
+    `[ENV_CHECK] OPENAI_API_KEY=${!!process.env.OPENAI_API_KEY} TAVILY_API_KEY=${!!process.env.TAVILY_API_KEY} BRAVE_API_KEY=${!!process.env.BRAVE_API_KEY} CRUNCHBASE_API_KEY=${!!process.env.CRUNCHBASE_API_KEY}`
+  );
+
   try {
     assertRequestNotTooLarge(req);
     const body = await req.json();

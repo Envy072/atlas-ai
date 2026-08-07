@@ -62,6 +62,11 @@ export async function synthesizeDecision(
   request: DecisionSynthesisRequest,
   analysisId: string
 ): Promise<DecisionSynthesisResult> {
+  // TEMPORARY — Milestone 127 timeout investigation, remove after root
+  // cause is confirmed.
+  const fanoutStartedAt = Date.now();
+  console.log(`[DECISION_TIMING] phase=fanout event=started`);
+
   const [researchResult, competitorDiscovery, marketDiscovery, financialDiscovery, businessDiscovery] =
     await Promise.all([
       runResearch({ topic: buildDecisionResearchQuery(request.startupIdea) }),
@@ -70,6 +75,12 @@ export async function synthesizeDecision(
       discoverFinancials({ startupIdea: request.startupIdea }),
       discoverBusiness({ startupIdea: request.startupIdea }),
     ]);
+
+  // TEMPORARY — Milestone 127 timeout investigation, remove after root
+  // cause is confirmed.
+  console.log(
+    `[DECISION_TIMING] phase=fanout event=completed durationMs=${Date.now() - fanoutStartedAt}`
+  );
 
   // Milestone 16: resolves this run's raw, unpersisted discovery
   // candidates into real, identity-matched CompanyProfile records — the
@@ -114,14 +125,29 @@ export async function synthesizeDecision(
   // here (already async) rather than inline inside buildDecisionProfile()
   // (kept synchronous), so this is the only new await this milestone
   // introduces at this layer (MILESTONE_34_DESIGN.md Section 5).
+  //
+  // TEMPORARY (the three console.log-bracketed timers below) —
+  // Milestone 127 timeout investigation, remove after root cause is
+  // confirmed. Measures each OpenAI generation call independently, since
+  // these three run sequentially, not concurrently.
+  const findingsStartedAt = Date.now();
+  console.log(`[DECISION_TIMING] phase=findings event=started`);
   const findings = await deriveFindings(request.startupIdea, aggregated.evidence);
+  console.log(
+    `[DECISION_TIMING] phase=findings event=completed durationMs=${Date.now() - findingsStartedAt}`
+  );
 
   // Milestone 35: real, evidence-constrained critical risk generation —
   // the identical async-migration pattern deriveFindings() above
   // already uses, applied to deriveCriticalRisks() (previously called
   // inline inside buildDecisionProfile()) (MILESTONE_35_DESIGN.md
   // Section 5).
+  const risksStartedAt = Date.now();
+  console.log(`[DECISION_TIMING] phase=risks event=started`);
   const criticalRisks = await deriveCriticalRisks(request.startupIdea, aggregated.evidence);
+  console.log(
+    `[DECISION_TIMING] phase=risks event=completed durationMs=${Date.now() - risksStartedAt}`
+  );
 
   // Milestone 36: real, evidence-constrained investment thesis
   // generation — the identical async-migration pattern deriveFindings()/
@@ -129,7 +155,12 @@ export async function synthesizeDecision(
   // deriveInvestmentThesis() (previously called inline inside
   // buildDecisionProfile()) (MILESTONE_36_DESIGN.md Section 5). Closes
   // the last of the three facets that started this way.
+  const thesisStartedAt = Date.now();
+  console.log(`[DECISION_TIMING] phase=thesis event=started`);
   const investmentThesis = await deriveInvestmentThesis(request.startupIdea, aggregated.evidence);
+  console.log(
+    `[DECISION_TIMING] phase=thesis event=completed durationMs=${Date.now() - thesisStartedAt}`
+  );
 
   const profile = buildDecisionProfile({
     decisionContext: {

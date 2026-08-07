@@ -70,6 +70,17 @@ async function callProviderOnce(
     result = buildErrorResult(provider.id, query.topic, startedAt, error);
   }
 
+  // TEMPORARY — Milestone 127 timeout investigation, remove after root
+  // cause is confirmed. result.tookMs is already computed above by
+  // buildTimeoutResult/buildErrorResult/the provider's own success path;
+  // this only logs it. Deliberately logs every status, including
+  // not_configured/not_implemented (recordAttempt below excludes those
+  // from metrics on purpose, but they're exactly the signal that would
+  // confirm a missing API key).
+  console.log(
+    `[PROVIDER_TIMING] provider=${provider.id} status=${result.status} tookMs=${result.tookMs}`
+  );
+
   // "not_configured"/"not_implemented" never actually attempted a
   // network call — recording them would silently dilute the failure
   // rate computeHealth() relies on (totalRequests would climb with
