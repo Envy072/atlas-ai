@@ -1,5 +1,19 @@
 import { z } from "zod";
-import { PipelineContextSchema, ProgressSnapshotSchema } from "@/lib/pipeline";
+// Milestone 127 — imported from their specific schema files, not
+// lib/pipeline's full public barrel as this file's own pre-existing
+// comment below still describes in spirit: that barrel now also
+// re-exports pipelineEngine.ts's startPipeline() etc., which imports
+// lib/shared's AsyncLocalStorage-based execution-context helper (needs
+// the Node-only node:async_hooks). This schema file is reachable from
+// hooks/useAnalysisSession.ts (a Client Component, re-validating a
+// polled response) via lib/schemas/analysisSessionView.ts — a bundler
+// resolving the whole lib/pipeline barrel to reach these two schemas
+// hits that dependency even though pipelineEngine.ts's own functions are
+// never called client-side. Both target files are confirmed
+// dependency-free of pipelineEngine.ts itself (verified by reading each
+// directly, not assumed).
+import { PipelineContextSchema } from "@/lib/pipeline/schemas/context.schema";
+import { ProgressSnapshotSchema } from "@/lib/pipeline/schemas/progress.schema";
 import { SessionStateSchema } from "@/lib/analysis-session/schemas/enums";
 import { TimelineEntrySchema } from "@/lib/analysis-session/schemas/timeline.schema";
 
@@ -11,6 +25,14 @@ import { TimelineEntrySchema } from "@/lib/analysis-session/schemas/timeline.sch
 // shape is reused, sourced entirely from lib/pipeline's own public
 // PipelineContextSchema export.
 const SessionResultSchema = PipelineContextSchema.shape.decision;
+
+// Milestone 127 — the identical reuse pattern as SessionResultSchema
+// above, one field over: PipelineContextSchema's own `debug` field
+// (runtime timing measurements, defined in lib/shared since both
+// lib/research and lib/pipeline need to touch it — see
+// lib/shared/timingSchema.ts's own comment) is reused verbatim, never
+// redefined here.
+const SessionDebugSchema = PipelineContextSchema.shape.debug;
 
 // The lightweight record this layer actually persists — deliberately
 // small. Everything else about a session (state, progress, timeline,
@@ -51,6 +73,7 @@ export const AnalysisSessionSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   result: SessionResultSchema,
+  debug: SessionDebugSchema,
 });
 
 export type AnalysisSession = z.infer<typeof AnalysisSessionSchema>;

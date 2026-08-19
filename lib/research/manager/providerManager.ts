@@ -8,6 +8,7 @@ import { recordAttempt, getMetricsSnapshot } from "@/lib/research/manager/metric
 import { computeHealth } from "@/lib/research/manager/health";
 import { DEFAULT_RETRY_POLICY } from "@/lib/research/manager/retryPolicy";
 import { FALLBACK_CHAINS } from "@/lib/research/manager/fallbackChains";
+import { getCurrentExecutionId, recordProviderCall } from "@/lib/shared";
 
 export interface ManagedProviderResult {
   result: ProviderResult;
@@ -48,10 +49,17 @@ function buildErrorResult(providerId: ProviderId, topic: string, startedAt: numb
 // have their own ~8s internal timeout) — it does not cancel the
 // provider's own in-flight request, but it guarantees ProviderManager
 // itself never waits past `policy.timeoutMs` for an answer.
+//
+// `attempt` (Milestone 127, default 0) — the caller's own retry counter,
+// passed through only so this function's one runtime-timing record
+// below can report which attempt it was; it changes no retry/timeout
+// behavior here, which is entirely policy/callProviderWithRetry's own,
+// unchanged.
 async function callProviderOnce(
   provider: ResearchProvider,
   query: ProviderQuery,
-  policy: RetryPolicy
+  policy: RetryPolicy,
+  attempt = 0
 ): Promise<ManagedProviderResult> {
   const startedAt = Date.now();
 
@@ -70,16 +78,26 @@ async function callProviderOnce(
     result = buildErrorResult(provider.id, query.topic, startedAt, error);
   }
 
-  // TEMPORARY — Milestone 127 timeout investigation, remove after root
-  // cause is confirmed. result.tookMs is already computed above by
-  // buildTimeoutResult/buildErrorResult/the provider's own success path;
-  // this only logs it. Deliberately logs every status, including
-  // not_configured/not_implemented (recordAttempt below excludes those
-  // from metrics on purpose, but they're exactly the signal that would
-  // confirm a missing API key).
-  console.log(
-    `[PROVIDER_TIMING] provider=${provider.id} status=${result.status} tookMs=${result.tookMs}`
-  );
+  // Milestone 127 — records this real attempt into the shared runtime
+  // timing collector (lib/shared/timingCollector.ts), correlated to
+  // whichever pipeline execution is currently running (if any) via
+  // lib/shared/executionContext.ts's AsyncLocalStorage-based
+  // getCurrentExecutionId() — a no-op outside of a tracked execution
+  // (e.g. a unit test calling this file directly). result.tookMs is
+  // already computed above by buildTimeoutResult/buildErrorResult/the
+  // provider's own success path; this only records it. Deliberately
+  // records every status, including not_configured/not_implemented
+  // (recordAttempt below excludes those from metrics on purpose, but
+  // they're exactly the signal that would confirm a missing API key).
+  recordProviderCall(await getCurrentExecutionId(), {
+    provider: provider.id,
+    operation: "search",
+    startedAt: new Date(startedAt).toISOString(),
+    finishedAt: new Date().toISOString(),
+    durationMs: result.tookMs,
+    success: result.status === "ok",
+    retryCount: attempt,
+  });
 
   // "not_configured"/"not_implemented" never actually attempted a
   // network call — recording them would silently dilute the failure
@@ -112,7 +130,7 @@ async function callProviderWithRetry(
   policy: RetryPolicy
 ): Promise<ManagedProviderResult> {
   let attempt = 0;
-  let outcome = await callProviderOnce(provider, query, policy);
+  let outcome = await callProviderOnce(provider, query, policy, attempt);
 
   while (
     attempt < policy.maxRetries &&
@@ -120,7 +138,7 @@ async function callProviderWithRetry(
   ) {
     attempt += 1;
     await sleep(policy.baseBackoffMs * 2 ** (attempt - 1));
-    outcome = await callProviderOnce(provider, query, policy);
+    outcome = await callProviderOnce(provider, query, policy, attempt);
   }
 
   return outcome;

@@ -1,4 +1,11 @@
-import { TOTAL_STAGES } from "@/lib/pipeline";
+// Milestone 127 — TOTAL_STAGES imported from its specific file, not
+// lib/pipeline's full public barrel: this file is reachable from a
+// Client Component (components/workspace/session/
+// SessionProgressExperience.tsx), and the full barrel now also
+// re-exports pipelineEngine.ts, which needs the Node-only
+// node:async_hooks. The `import type` line below stays as-is — type-only
+// imports are erased at compile time and never reach the bundler.
+import { TOTAL_STAGES } from "@/lib/pipeline/progress/progressCalculator";
 import type { ProgressSnapshot, StageName } from "@/lib/pipeline";
 
 const STAGE_DISPLAY_NAMES: Record<StageName, string> = {

@@ -19,6 +19,7 @@ import {
 import { emitPipelineEvent, subscribeToExecution } from "@/lib/pipeline/events/eventEmitter";
 import { writeCheckpoint, CheckpointConflictError } from "@/lib/pipeline/checkpoint/checkpointWriter";
 import { createStore } from "@/lib/pipeline/storage/createStore";
+import { runWithExecutionId, recordStageStart, recordStageEnd, finishTimings } from "@/lib/shared";
 import {
   researchStage,
   competitorsStage,
@@ -178,14 +179,10 @@ async function executeStageWithRetry<TResult>(
       attempt,
     });
 
-    // TEMPORARY — Milestone 127 timeout investigation, remove after root
-    // cause is confirmed. Fires synchronously before this stage's async
-    // work begins, so the last STARTED line with no matching COMPLETED
-    // line after it identifies the stage in progress when the platform
-    // kills the request.
-    console.log(
-      `[PIPELINE_TIMING] stage=${stage.name} event=started attempt=${attempt} executionId=${current.id}`
-    );
+    // Milestone 127 — records this attempt's own start for the runtime
+    // timing collector (lib/shared's timingCollector.ts). Overwritten on
+    // a retry, so this always reflects the most recent attempt.
+    recordStageStart(current.id, stage.name, startedAt.toISOString());
 
     let result: TResult;
     try {
@@ -193,7 +190,15 @@ async function executeStageWithRetry<TResult>(
       // to every stage so decisionStage can scope market/competitor
       // knowledge resolution to this one analysis; the other five
       // stages simply don't declare a second parameter and ignore it.
-      result = await stage.run(current.startupIdea, current.id);
+      //
+      // Milestone 127 — also wrapped in runWithExecutionId() so every
+      // provider call made anywhere inside this stage's own execution,
+      // however deeply nested, can correlate itself back to current.id
+      // via lib/shared's executionContext.ts's getCurrentExecutionId()
+      // without any of the intervening functions (runResearch,
+      // discoverCompetitors, discoverMarket, discoverFinancials,
+      // discoverBusiness, synthesizeDecision) needing a new parameter.
+      result = await runWithExecutionId(current.id, () => stage.run(current.startupIdea, current.id));
     } catch (error) {
       const failedAt = new Date();
       const message = getErrorMessage(error);
@@ -273,12 +278,9 @@ async function executeStageWithRetry<TResult>(
     const finishedAt = new Date();
     const durationMs = finishedAt.getTime() - startedAt.getTime();
 
-    // TEMPORARY — Milestone 127 timeout investigation, remove after root
-    // cause is confirmed. durationMs is already computed above for
-    // succeededRecord; this only logs it.
-    console.log(
-      `[PIPELINE_TIMING] stage=${stage.name} event=completed attempt=${attempt} executionId=${current.id} durationMs=${durationMs}`
-    );
+    // Milestone 127 — durationMs is already computed above for
+    // succeededRecord; this only records it into the timing collector.
+    recordStageEnd(current.id, stage.name, finishedAt.toISOString(), durationMs);
 
     const succeededRecord: StageRecord = {
       stage: stage.name,
@@ -375,6 +377,21 @@ async function runOneStage(
   }
 }
 
+// Milestone 127 — reads and clears this execution's own collected
+// runtime measurements (lib/shared's timingCollector.ts) and attaches
+// them to its PipelineContext — the same additive, optional
+// field every other stage's own result already occupies (see
+// context.schema.ts's own `debug` comment), so this flows through the
+// existing checkpoint/compose/API-response path with no new storage or
+// transport mechanism. Returns `execution` unchanged (same reference) if
+// nothing was ever recorded, so a caller can tell whether an extra write
+// is actually needed.
+function attachTimingsToContext(execution: PipelineExecution): PipelineExecution {
+  const timings = finishTimings(execution.id);
+  if (!timings) return execution;
+  return { ...execution, context: { ...execution.context, debug: { timings } } };
+}
+
 // Drives the execution from wherever `currentStageIndex` says it should
 // resume, through to `completed` — or until a stage lands in
 // `stage_failed`, or cancellation is observed. Shared by startPipeline
@@ -397,6 +414,7 @@ async function runFromCurrentStage(
     const latest = await store.getById(current.id);
     if (latest && latest.state === "cancelling") {
       current = transitionTo(latest, "cancelled", new Date());
+      current = attachTimingsToContext(current);
       emitPipelineEvent({ type: "pipeline.cancelled", executionId: current.id, timestamp: current.updatedAt });
       current = await writeCheckpointYieldingToCancellation(store, current);
       return current;
@@ -406,6 +424,14 @@ async function runFromCurrentStage(
     trigger = "initial"; // only the first stage driven by this call uses the caller-supplied trigger
 
     if (current.state === "stage_failed" || current.state === "cancelled" || current.state === "failed") {
+      // Milestone 127 — the terminal checkpoint for this failure was
+      // already written inside executeStageWithRetry(), before this
+      // function regained control; this second, small write exists only
+      // to attach whatever timings were collected up to the failure
+      // (never discarded), and is skipped entirely when there's nothing
+      // new to attach (attachTimingsToContext returns the same reference).
+      const withTimings = attachTimingsToContext(current);
+      current = withTimings === current ? current : await writeCheckpointYieldingToCancellation(store, withTimings);
       return current;
     }
 
@@ -413,6 +439,7 @@ async function runFromCurrentStage(
   }
 
   current = transitionTo(current, "completed", new Date());
+  current = attachTimingsToContext(current);
   emitPipelineEvent({ type: "pipeline.completed", executionId: current.id, timestamp: current.updatedAt });
   current = await writeCheckpointYieldingToCancellation(store, current);
   return current;

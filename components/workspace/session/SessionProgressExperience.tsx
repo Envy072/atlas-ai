@@ -7,7 +7,16 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/ui/status-pill";
 import { cn } from "@/lib/utils";
-import { formatProgress, STAGE_ORDER } from "@/lib/analysis-session";
+// Milestone 127 — imported from their specific files, not
+// lib/analysis-session's full public barrel: this is a Client Component,
+// and that barrel also re-exports sessionEventEmitter.ts's
+// subscribeToSession, which imports lib/pipeline's own real
+// orchestration functions, which now need lib/shared's
+// AsyncLocalStorage-based execution-context helper — the Node-only
+// node:async_hooks. The `import type` line stays as-is — type-only
+// imports are erased at compile time and never reach the bundler.
+import { formatProgress } from "@/lib/analysis-session/progress/formatProgress";
+import { STAGE_ORDER } from "@/lib/analysis-session/timeline/buildTimeline";
 import type { AnalysisSession, TimelineEntry } from "@/lib/analysis-session";
 import { isTerminalSessionState } from "@/hooks/useAnalysisSession";
 

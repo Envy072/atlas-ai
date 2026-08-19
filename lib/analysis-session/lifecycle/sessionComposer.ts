@@ -30,6 +30,11 @@ export function composeAnalysisSession(
       createdAt: record.createdAt,
       updatedAt: execution.updatedAt,
       result: execution.context.decision,
+      // Milestone 127 — passed through unchanged, same "derived, not
+      // duplicated" rule as `result` above: the execution's own
+      // PipelineContext.debug (lib/pipeline/engine/pipelineEngine.ts's
+      // attachTimingsToContext) is this field's only source.
+      debug: execution.context.debug,
     },
     "Failed to build a schema-valid AnalysisSession."
   );

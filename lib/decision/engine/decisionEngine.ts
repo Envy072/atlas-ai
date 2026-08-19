@@ -14,6 +14,19 @@ import { deriveFindings } from "@/lib/decision/findings/findingBuilder";
 import { deriveCriticalRisks } from "@/lib/decision/redflags/riskFinding";
 import { deriveInvestmentThesis } from "@/lib/decision/thesis/investmentThesis";
 import { parseOrThrow } from "@/lib/validation/parse";
+import { recordDecisionTiming } from "@/lib/shared";
+
+// Milestone 127 — wraps an already-constructed, already-running promise
+// (never changes when or how it's invoked) purely to measure its own
+// individual duration, even though it resolves concurrently with several
+// siblings inside the same Promise.all below. The promise is passed in
+// already "hot" — `withTiming` starts its own clock at the moment it's
+// called, which for every use below is the same synchronous tick the
+// wrapped call itself starts on.
+function withTiming<T>(promise: Promise<T>): Promise<{ value: T; durationMs: number }> {
+  const startedAt = Date.now();
+  return promise.then((value) => ({ value, durationMs: Date.now() - startedAt }));
+}
 
 // Frames the startup idea as a decision-synthesis query — a deliberately
 // different string than any of the four platforms below it use for
@@ -62,25 +75,33 @@ export async function synthesizeDecision(
   request: DecisionSynthesisRequest,
   analysisId: string
 ): Promise<DecisionSynthesisResult> {
-  // TEMPORARY — Milestone 127 timeout investigation, remove after root
-  // cause is confirmed.
+  // Milestone 127 — each branch is timed individually (withTiming, above)
+  // while remaining exactly as concurrent as before; fanoutMs is the
+  // overall Promise.all duration, unchanged in meaning from what this
+  // milestone's own temporary console.log originally measured.
   const fanoutStartedAt = Date.now();
-  console.log(`[DECISION_TIMING] phase=fanout event=started`);
 
-  const [researchResult, competitorDiscovery, marketDiscovery, financialDiscovery, businessDiscovery] =
-    await Promise.all([
-      runResearch({ topic: buildDecisionResearchQuery(request.startupIdea) }),
-      discoverCompetitors({ startupIdea: request.startupIdea }),
-      discoverMarket({ startupIdea: request.startupIdea }),
-      discoverFinancials({ startupIdea: request.startupIdea }),
-      discoverBusiness({ startupIdea: request.startupIdea }),
-    ]);
+  const [
+    { value: researchResult, durationMs: researchMs },
+    { value: competitorDiscovery, durationMs: competitorsMs },
+    { value: marketDiscovery, durationMs: marketMs },
+    { value: financialDiscovery, durationMs: financialMs },
+    { value: businessDiscovery, durationMs: businessMs },
+  ] = await Promise.all([
+    withTiming(runResearch({ topic: buildDecisionResearchQuery(request.startupIdea) })),
+    withTiming(discoverCompetitors({ startupIdea: request.startupIdea })),
+    withTiming(discoverMarket({ startupIdea: request.startupIdea })),
+    withTiming(discoverFinancials({ startupIdea: request.startupIdea })),
+    withTiming(discoverBusiness({ startupIdea: request.startupIdea })),
+  ]);
 
-  // TEMPORARY — Milestone 127 timeout investigation, remove after root
-  // cause is confirmed.
-  console.log(
-    `[DECISION_TIMING] phase=fanout event=completed durationMs=${Date.now() - fanoutStartedAt}`
-  );
+  const fanoutMs = Date.now() - fanoutStartedAt;
+  recordDecisionTiming(analysisId, "fanoutMs", fanoutMs);
+  recordDecisionTiming(analysisId, "researchMs", researchMs);
+  recordDecisionTiming(analysisId, "competitorsMs", competitorsMs);
+  recordDecisionTiming(analysisId, "marketMs", marketMs);
+  recordDecisionTiming(analysisId, "financialMs", financialMs);
+  recordDecisionTiming(analysisId, "businessMs", businessMs);
 
   // Milestone 16: resolves this run's raw, unpersisted discovery
   // candidates into real, identity-matched CompanyProfile records — the
@@ -126,16 +147,12 @@ export async function synthesizeDecision(
   // (kept synchronous), so this is the only new await this milestone
   // introduces at this layer (MILESTONE_34_DESIGN.md Section 5).
   //
-  // TEMPORARY (the three console.log-bracketed timers below) —
-  // Milestone 127 timeout investigation, remove after root cause is
-  // confirmed. Measures each OpenAI generation call independently, since
-  // these three run sequentially, not concurrently.
+  // Milestone 127 — each of the three timers below measures one call
+  // independently, since these three run sequentially, not concurrently
+  // (unchanged — this instrumentation does not parallelize them).
   const findingsStartedAt = Date.now();
-  console.log(`[DECISION_TIMING] phase=findings event=started`);
   const findings = await deriveFindings(request.startupIdea, aggregated.evidence);
-  console.log(
-    `[DECISION_TIMING] phase=findings event=completed durationMs=${Date.now() - findingsStartedAt}`
-  );
+  recordDecisionTiming(analysisId, "findingsMs", Date.now() - findingsStartedAt);
 
   // Milestone 35: real, evidence-constrained critical risk generation —
   // the identical async-migration pattern deriveFindings() above
@@ -143,11 +160,8 @@ export async function synthesizeDecision(
   // inline inside buildDecisionProfile()) (MILESTONE_35_DESIGN.md
   // Section 5).
   const risksStartedAt = Date.now();
-  console.log(`[DECISION_TIMING] phase=risks event=started`);
   const criticalRisks = await deriveCriticalRisks(request.startupIdea, aggregated.evidence);
-  console.log(
-    `[DECISION_TIMING] phase=risks event=completed durationMs=${Date.now() - risksStartedAt}`
-  );
+  recordDecisionTiming(analysisId, "risksMs", Date.now() - risksStartedAt);
 
   // Milestone 36: real, evidence-constrained investment thesis
   // generation — the identical async-migration pattern deriveFindings()/
@@ -156,11 +170,8 @@ export async function synthesizeDecision(
   // buildDecisionProfile()) (MILESTONE_36_DESIGN.md Section 5). Closes
   // the last of the three facets that started this way.
   const thesisStartedAt = Date.now();
-  console.log(`[DECISION_TIMING] phase=thesis event=started`);
   const investmentThesis = await deriveInvestmentThesis(request.startupIdea, aggregated.evidence);
-  console.log(
-    `[DECISION_TIMING] phase=thesis event=completed durationMs=${Date.now() - thesisStartedAt}`
-  );
+  recordDecisionTiming(analysisId, "thesisMs", Date.now() - thesisStartedAt);
 
   const profile = buildDecisionProfile({
     decisionContext: {

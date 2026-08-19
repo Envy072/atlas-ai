@@ -1,4 +1,12 @@
-import { StageNameSchema } from "@/lib/pipeline";
+// Milestone 127 — StageNameSchema imported from its specific file, not
+// lib/pipeline's full public barrel: this file's own STAGE_ORDER export
+// is reachable from a Client Component
+// (components/workspace/session/SessionProgressExperience.tsx), and the
+// full barrel now also re-exports pipelineEngine.ts, which needs the
+// Node-only node:async_hooks. The `import type` line below stays as-is —
+// type-only imports are erased at compile time and never reach the
+// bundler.
+import { StageNameSchema } from "@/lib/pipeline/schemas/enums";
 import type { PipelineExecution, StageName } from "@/lib/pipeline";
 import type { TimelineEntry } from "@/lib/analysis-session/schemas/timeline.schema";
 import { nextTimelineEntryId } from "@/lib/analysis-session/utils/id";
