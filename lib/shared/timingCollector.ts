@@ -100,3 +100,24 @@ export function finishTimings(executionId: string): ExecutionTimings | undefined
     decision: entry.decision,
   };
 }
+
+// The non-destructive counterpart to finishTimings() — reads this
+// execution's own current snapshot WITHOUT clearing it, so it can be
+// called repeatedly across a run (pipelineEngine.ts's own per-stage
+// checkpoint writes) and still reflect everything recorded so far,
+// including whatever the NEXT stage still has to add. `totalMs` here is
+// "elapsed so far," not a final total, when read before the run has
+// actually finished — only finishTimings()'s own terminal call gives a
+// true final duration. Returns undefined under the identical condition
+// finishTimings() does.
+export function peekTimings(executionId: string): ExecutionTimings | undefined {
+  const entry = collectorsByExecution.get(executionId);
+  if (!entry) return undefined;
+
+  return {
+    totalMs: Date.now() - entry.startedAt,
+    stages: entry.stages,
+    providers: entry.providers,
+    decision: entry.decision,
+  };
+}

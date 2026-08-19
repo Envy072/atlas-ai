@@ -19,7 +19,7 @@ import {
 import { emitPipelineEvent, subscribeToExecution } from "@/lib/pipeline/events/eventEmitter";
 import { writeCheckpoint, CheckpointConflictError } from "@/lib/pipeline/checkpoint/checkpointWriter";
 import { createStore } from "@/lib/pipeline/storage/createStore";
-import { runWithExecutionId, recordStageStart, recordStageEnd, finishTimings } from "@/lib/shared";
+import { runWithExecutionId, recordStageStart, recordStageEnd, finishTimings, peekTimings } from "@/lib/shared";
 import {
   researchStage,
   competitorsStage,
@@ -184,6 +184,20 @@ async function executeStageWithRetry<TResult>(
     // a retry, so this always reflects the most recent attempt.
     recordStageStart(current.id, stage.name, startedAt.toISOString());
 
+    // Milestone 127 (incremental persistence) — a checkpoint write at the
+    // very start of every stage attempt, before that attempt's own work
+    // begins, so `debug.timings` on the persisted row always reflects at
+    // least "this stage started at T" even if the process is killed
+    // before the stage's own natural end-of-attempt write below is ever
+    // reached. `current` itself is otherwise unchanged here (no state
+    // transition) — only its `context.debug` snapshot advances, through
+    // the same single-writer writeCheckpointYieldingToCancellation() path
+    // every other write in this function already uses, so the version-
+    // conflict/cancellation-yielding guarantees are identical.
+    current = enrichContextWithTimings(current);
+    current = await writeCheckpointYieldingToCancellation(store, current);
+    if (current.state === "cancelled") return current;
+
     let result: TResult;
     try {
       // Milestone 116 — current.id (this execution's own id) is passed
@@ -228,6 +242,11 @@ async function executeStageWithRetry<TResult>(
           attempt,
           message,
         });
+        // Milestone 127 (incremental persistence) — enriched with
+        // whatever timings are collected so far before this write, the
+        // same non-destructive peekTimings()-based snapshot every other
+        // enriched write in this function uses.
+        current = enrichContextWithTimings(current);
         current = await writeCheckpointYieldingToCancellation(store, current);
         if (current.state === "cancelled") return current;
 
@@ -247,6 +266,10 @@ async function executeStageWithRetry<TResult>(
         // "retry_pending" through the next attempt, and a subsequent
         // successful attempt's own checkpoint could conflict against a
         // version this loop itself never advanced.
+        //
+        // Milestone 127 (incremental persistence) — enriched the same way
+        // as every other write in this function.
+        current = enrichContextWithTimings(current);
         current = await writeCheckpointYieldingToCancellation(store, current);
         if (current.state === "cancelled") return current;
         trigger = "auto_retry";
@@ -271,6 +294,12 @@ async function executeStageWithRetry<TResult>(
         attempt,
         message,
       });
+      // Milestone 127 (incremental persistence) — enriched the same way
+      // as every other write in this function; this is the last write
+      // this execution will ever make on its own (stage_failed is
+      // terminal for this function), so it's the final chance to persist
+      // whatever timings were collected before the failure.
+      current = enrichContextWithTimings(current);
       current = await writeCheckpointYieldingToCancellation(store, current);
       return current;
     }
@@ -308,6 +337,11 @@ async function executeStageWithRetry<TResult>(
       stage: stage.name,
       attempt,
     });
+    // Milestone 127 (incremental persistence) — enriched the same way as
+    // every other write in this function; applied after applyResult()
+    // above so this stage's own fresh result isn't lost, and before the
+    // write so the persisted row reflects both in one checkpoint.
+    current = enrichContextWithTimings(current);
     current = await writeCheckpointYieldingToCancellation(store, current);
     return current;
   }
@@ -388,6 +422,23 @@ async function runOneStage(
 // is actually needed.
 function attachTimingsToContext(execution: PipelineExecution): PipelineExecution {
   const timings = finishTimings(execution.id);
+  if (!timings) return execution;
+  return { ...execution, context: { ...execution.context, debug: { timings } } };
+}
+
+// The non-destructive counterpart to attachTimingsToContext() above, for
+// every checkpoint write that ISN'T a terminal state. Uses peekTimings()
+// (reads without clearing) instead of finishTimings(), so mid-run
+// checkpoints — a stage starting, retrying, or succeeding — carry
+// whatever timing data has been collected so far, without disturbing the
+// in-memory collector any other, later checkpoint (including the eventual
+// terminal one) still needs to read from. Exists so a run that ends in a
+// hard process kill (a platform-level timeout, not a JS exception —
+// nothing after that point ever runs, including attachTimingsToContext()
+// itself) still leaves its most recently persisted checkpoint carrying
+// real, measured per-stage/per-provider timings, instead of none at all.
+function enrichContextWithTimings(execution: PipelineExecution): PipelineExecution {
+  const timings = peekTimings(execution.id);
   if (!timings) return execution;
   return { ...execution, context: { ...execution.context, debug: { timings } } };
 }

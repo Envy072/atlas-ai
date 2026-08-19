@@ -7,6 +7,7 @@ export {
   recordProviderCall,
   recordDecisionTiming,
   finishTimings,
+  peekTimings,
 } from "@/lib/shared/timingCollector";
 export {
   DebugInfoSchema,

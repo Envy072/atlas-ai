@@ -271,10 +271,21 @@ describe("concurrent recovery attempts / duplicate recovery suppression", () => 
 
     const final = await inner.getById(staleExecution.id);
     expect(final?.state).toBe("running");
-    // Exactly one real write happened (the injected one) — both
-    // resumePipeline attempts reconciled against it rather than each
-    // writing their own competing version.
-    expect(final?.version).toBe(staleExecution.version + 1);
+    // Two real writes happen beyond the stale row itself: the injected
+    // out-of-band write, then exactly one of the two resumePipeline
+    // attempts' own Milestone 127 stage-start checkpoint write (the
+    // non-destructive `debug.timings` snapshot executeStageWithRetry now
+    // persists immediately before a stage's own work begins). Both
+    // attempts' "mark running" writes reconcile against the injected row
+    // without writing (identical target state, per
+    // writeCheckpointYieldingToCancellation's `current.state ===
+    // execution.state` branch), so they don't add a version each — but
+    // once both attempts reach executeStageWithRetry with the same
+    // reconciled version, only the first stage-start write actually lands;
+    // the second loses the version race and reconciles the same way,
+    // again without writing. Net: staleExecution.version + 1 (injected) +
+    // 1 (the one winning stage-start write) = + 2.
+    expect(final?.version).toBe(staleExecution.version + 2);
   });
 });
 
