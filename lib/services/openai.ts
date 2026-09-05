@@ -372,15 +372,22 @@ function buildVerdictPrompt(
 // function's own responsibility ends at producing a schema-valid
 // CandidateFinding[] or throwing ExternalServiceError.
 //
-// Retry policy: relies entirely on the OpenAI SDK's own documented
-// default (maxRetries: 2) — no custom retry policy is configured here,
-// a deliberate choice (MILESTONE_34_DESIGN.md Section 5), not an
-// omission.
+// Retry/timeout policy (Milestone 127 — production timeout hardening):
+// an explicit { timeout: 20_000, maxRetries: 1 } bound, replacing the
+// SDK's own undocumented-here defaults (600_000ms/attempt, maxRetries:
+// 2 — up to ~1800s worst case) this file previously relied on
+// (MILESTONE_34_DESIGN.md Section 5's own "deliberate choice, not an
+// omission" no longer holds now that this call sits on the pipeline's
+// synchronous critical path behind a 60s serverless function
+// timeout). 20s comfortably covers a normal completion against this
+// file's own bounded evidence prompt (MAX_EVIDENCE_ITEMS); a genuine
+// timeout still degrades gracefully via this function's own caller
+// (deriveFindings()'s existing catch block), unchanged.
 export async function generateCandidateFindings(
   startupIdea: string,
   evidence: Evidence[]
 ): Promise<CandidateFinding[]> {
-  const client = new OpenAI();
+  const client = new OpenAI({ timeout: 20_000, maxRetries: 1 });
 
   try {
     const completion = await client.chat.completions.parse({
@@ -434,15 +441,16 @@ export async function generateCandidateFindings(
 // throwing ExternalServiceError.
 //
 // Retry policy: relies entirely on the OpenAI SDK's own documented
-// default (maxRetries: 2), the same inherited default
-// generateCandidateFindings() relies on — no custom retry policy is
-// configured here, a deliberate choice (MILESTONE_35_DESIGN.md
-// Section 5), not an omission.
+// Milestone 127 — same explicit { timeout: 20_000, maxRetries: 1 }
+// bound as generateCandidateFindings(), for the identical reason (see
+// that function's own comment): this call is also on the pipeline's
+// synchronous critical path, sequential with the other two Checkpoint
+// B calls, with no ceiling of its own until now.
 export async function generateCandidateRisks(
   startupIdea: string,
   evidence: Evidence[]
 ): Promise<CandidateRisk[]> {
-  const client = new OpenAI();
+  const client = new OpenAI({ timeout: 20_000, maxRetries: 1 });
 
   try {
     const completion = await client.chat.completions.parse({
@@ -494,15 +502,15 @@ export async function generateCandidateRisks(
 // CandidateThesisArgument[] or throwing ExternalServiceError.
 //
 // Retry policy: relies entirely on the OpenAI SDK's own documented
-// default (maxRetries: 2), the same inherited default the other two
-// exports rely on — no custom retry policy is configured here, a
-// deliberate choice (MILESTONE_36_DESIGN.md Section 5), not an
-// omission.
+// Milestone 127 — same explicit { timeout: 20_000, maxRetries: 1 }
+// bound as the other two Checkpoint B exports, for the identical
+// reason: this is the third and final sequential call on the
+// pipeline's own critical path.
 export async function generateCandidateThesisArguments(
   startupIdea: string,
   evidence: Evidence[]
 ): Promise<CandidateThesisArgument[]> {
-  const client = new OpenAI();
+  const client = new OpenAI({ timeout: 20_000, maxRetries: 1 });
 
   try {
     const completion = await client.chat.completions.parse({
@@ -572,9 +580,14 @@ export async function generateCandidateThesisArguments(
 //
 // Retry policy: relies entirely on the OpenAI SDK's own documented
 // default (maxRetries: 2), the same inherited default the other three
-// exports rely on — no custom retry policy is configured here, a
-// deliberate choice (MILESTONE_37_DESIGN.md Section 5), not an
-// omission.
+// Milestone 127 — same explicit { timeout: 20_000, maxRetries: 1 }
+// bound as the other four exports in this file, applied here too for
+// consistency even though this specific call isn't on
+// synthesizeDecision()'s own synchronous critical path (it's invoked
+// on demand via buildDecisionArtifacts()) — this file's five
+// generation exports are treated as structurally identical siblings
+// everywhere else, and leaving this one alone would silently
+// reintroduce the same unbounded-timeout defect on a less-visible path.
 export async function generateCandidateRecommendations(
   startupIdea: string,
   findings: Finding[],
@@ -582,7 +595,7 @@ export async function generateCandidateRecommendations(
   investmentThesis: InvestmentThesis,
   citableEvidence: Evidence[]
 ): Promise<CandidateRecommendation[]> {
-  const client = new OpenAI();
+  const client = new OpenAI({ timeout: 20_000, maxRetries: 1 });
 
   try {
     const completion = await client.chat.completions.parse({
@@ -661,10 +674,9 @@ export async function generateCandidateRecommendations(
 // the same "services own external I/O only, callers own domain
 // decisions" boundary every other export in this file already follows.
 //
-// Retry policy: relies entirely on the OpenAI SDK's own documented
-// default (maxRetries: 2), the same inherited default the other four
-// exports rely on — no custom retry policy is configured here, a
-// deliberate choice, not an omission.
+// Milestone 127 — same explicit { timeout: 20_000, maxRetries: 1 }
+// bound as the other four exports, for the identical consistency
+// reason generateCandidateRecommendations()'s own comment gives.
 export async function generateCandidateVerdict(
   startupIdea: string,
   findings: Finding[],
@@ -674,7 +686,7 @@ export async function generateCandidateVerdict(
   confidenceSummary: DecisionConfidence,
   citableEvidence: Evidence[]
 ): Promise<CandidateVerdict> {
-  const client = new OpenAI();
+  const client = new OpenAI({ timeout: 20_000, maxRetries: 1 });
 
   try {
     const completion = await client.chat.completions.parse({
