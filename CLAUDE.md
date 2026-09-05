@@ -564,12 +564,14 @@ viewport, breakpoints add columns as it grows (`grid-cols-1 sm:grid-cols-2
 xl:grid-cols-4` for stat grids, `lg:grid-cols-2` for paired detail cards).
 Every new grid degrades to one column on mobile.
 
-**Accessibility.** Known current gaps: decorative search inputs with no
-handler, icon-only sidebar nav with no visible label, no `aria-label`s on
-icon buttons. New interactive elements must not repeat these: every
-icon-only control gets an `aria-label`, every input gets a label (visual or
-`sr-only`), and focus states stay visible (shadcn's `focus-visible:ring-*`
-tokens already do this on `components/ui/` — don't override them away).
+**Accessibility.** Known current gaps: icon-only sidebar nav with no visible
+label, no `aria-label`s on icon buttons. (The dashboard search input, once
+decorative, is real and labeled as of Milestone 29 Deliverable 7 — see
+Section 21's Milestone 3 entry.) New interactive elements must not repeat
+the remaining gaps: every icon-only control gets an `aria-label`, every
+input gets a label (visual or `sr-only`), and focus states stay visible
+(shadcn's `focus-visible:ring-*` tokens already do this on `components/ui/`
+— don't override them away).
 
 ---
 
@@ -917,14 +919,25 @@ market/financial/business intelligence, recommendations, verdict, and
 confidence end to end (Milestones 21–24, 33–38), reading from
 `buildDecisionArtifacts()`.
 
-**Milestone 3 — Complete the surrounding product surface.** Partially
-complete. `/competitors` now shows a real aggregation of the signed-in
-user's own competitors (no longer a copy-paste bug); a full project detail
-route exists (`/projects/[id]`, the Decision Report surface); `/pricing` is
-real (Milestone 43–44). Still open: dashboard search is decorative with no
-handler (Section 9's own accessibility gap note); `/reports`, `/research`,
-and `/settings`' Account tab remain deliberate, explicitly-labeled stubs
-(`MILESTONE_29_DESIGN.md` Deliverable 8).
+**Milestone 3 — Complete the surrounding product surface.** ✅ **Complete**,
+as originally scoped by `MILESTONE_29_DESIGN.md`. `/competitors` shows a
+real aggregation of the signed-in user's own competitors (no longer a
+copy-paste bug); a full project detail route exists (`/projects/[id]`, the
+Decision Report surface); `/pricing` is real (Milestone 43–44); dashboard
+search is real, not decorative (Deliverable 7 — a controlled form
+submitting to `/projects?q=`, reusing the same in-progress-analysis guard
+`ProfileMenu` uses); `/reports` is a real, built page (Milestone 101,
+superseding its original "coming soon" stub); `/research` deliberately
+redirects to `/projects` (a Milestone 101 architectural decision — a
+standalone research workspace doesn't aggregate cleanly the way
+Competitors does — not an unfinished stub). Two permanent, intentional
+stubs remain by design, not as open work: `/templates` (a template library,
+never scoped past "planned for a future milestone") and `/settings`'
+Account tab (profile/avatar/account editing, deferred to
+`MILESTONE_28_DESIGN.md`'s own "Future Identity" section) — both are
+honest `EmptyState`s per Deliverable 8's own instruction to build a real
+stub, not a real feature, and neither has a design doc specifying what a
+built version would contain.
 
 **Milestone 4 — Authentication & multi-tenancy.** ✅ **Complete**, delivered
 across Milestones 27a–28: a real `lib/services/auth.ts` session model
