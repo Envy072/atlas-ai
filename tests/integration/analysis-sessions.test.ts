@@ -37,6 +37,29 @@ vi.mock("@/lib/pipeline/storage/createStore", async () => {
   return { createStore: () => store };
 });
 
+// The default market/competitor stores are real Supabase-backed as of
+// Milestone 125 (previously in-memory) — the decision stage reaches
+// them transitively through synthesizeDecision's own
+// resolveMarketKnowledge/resolveCompetitorKnowledge calls. Without this,
+// that real Supabase call fails in this test environment, the decision
+// stage exhausts its auto-retries, and every session in this file lands
+// on "stage_failed" instead of "completed" — invisible to every
+// pre-existing test here (none asserted on `state`), but exactly the
+// gap this file's own cancel/retry tests below depend on being closed.
+// Mirrors lib/pipeline/engine/pipelineEngine.recovery.test.ts's own
+// identical mock.
+vi.mock("@/lib/market/storage/createStore", async () => {
+  const { MemoryMarketStore } = await import("@/lib/market/storage/memoryStore");
+  const store = new MemoryMarketStore();
+  return { createStore: () => store };
+});
+
+vi.mock("@/lib/competitors/storage/createStore", async () => {
+  const { MemoryCompetitorStore } = await import("@/lib/competitors/storage/memoryStore");
+  const store = new MemoryCompetitorStore();
+  return { createStore: () => store };
+});
+
 // Milestone 44's monthly-limit check: getUserTier()/countProjectsThisMonth()'s
 // own internal correctness is already covered by their real unit tests
 // (lib/services/stripe.test.ts, lib/services/projects.test.ts) — mocked
@@ -70,6 +93,8 @@ import { countProjectsThisMonth } from "@/lib/services/projects";
 import { checkRateLimit } from "@/lib/services/rateLimit";
 import { POST } from "@/app/api/analysis-sessions/route";
 import { GET } from "@/app/api/analysis-sessions/[id]/route";
+import { POST as cancelPOST } from "@/app/api/analysis-sessions/[id]/cancel/route";
+import { POST as retryPOST } from "@/app/api/analysis-sessions/[id]/retry/route";
 import type { User } from "@supabase/supabase-js";
 
 const mockedCreateClient = vi.mocked(createClient);
@@ -104,6 +129,16 @@ function buildCreateRequest(body: unknown): Request {
 function buildGetRequest(id: string): { req: Request; context: { params: Promise<{ id: string }> } } {
   return {
     req: new Request(`http://localhost/api/analysis-sessions/${id}`),
+    context: { params: Promise.resolve({ id }) },
+  };
+}
+
+// cancel/retry are both POST, same request shape as buildGetRequest's
+// GET counterpart but with a method — no body, since both routes read
+// only the id from the URL params.
+function buildMutateRequest(id: string): { req: Request; context: { params: Promise<{ id: string }> } } {
+  return {
+    req: new Request(`http://localhost/api/analysis-sessions/${id}`, { method: "POST" }),
     context: { params: Promise.resolve({ id }) },
   };
 }
@@ -190,5 +225,86 @@ describe("POST /api/analysis-sessions → GET /api/analysis-sessions/:id", () =>
 
     expect(response.status).toBe(201);
     expect(mockedCountProjectsThisMonth).not.toHaveBeenCalled();
+  });
+});
+
+// The pipeline runs synchronously to completion inside POST (same
+// comment as the describe block above), so a session created via this
+// file's own POST helper is always already terminal ("completed", since
+// no research provider credentials exist in this environment) by the
+// time these tests reach it — there is no in-flight execution left to
+// meaningfully cancel. That's still real, honest production behavior
+// worth locking in: cancelling/retrying a session that isn't in the
+// state either mutation requires is a defined, documented outcome
+// (lib/pipeline/engine/pipelineEngine.ts's own isTerminalState/
+// stage_failed guards), not an untested edge case.
+describe("POST /api/analysis-sessions/:id/cancel", () => {
+  it("cancelling an already-completed session is a no-op that returns it unchanged", async () => {
+    const createResponse = await POST(buildCreateRequest({ startupIdea: "A meal-kit subscription box." }));
+    const created = await createResponse.json();
+
+    const { req, context } = buildMutateRequest(created.session.id);
+    const response = await cancelPOST(req, context);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.session.id).toBe(created.session.id);
+    expect(body.session.state).toBe("completed");
+  });
+
+  it("returns the app's documented not-found response for a nonexistent session id", async () => {
+    const { req, context } = buildMutateRequest("session-does-not-exist");
+    const response = await cancelPOST(req, context);
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe('No analysis session found for id "session-does-not-exist".');
+  });
+
+  it("rejects the request with 429 when the caller has exceeded the mutate rate limit", async () => {
+    const createResponse = await POST(buildCreateRequest({ startupIdea: "A pet-sitting marketplace." }));
+    const created = await createResponse.json();
+
+    mockedCheckRateLimit.mockResolvedValue({ allowed: false, limit: 20, remaining: 0 });
+
+    const { req, context } = buildMutateRequest(created.session.id);
+    const response = await cancelPOST(req, context);
+
+    expect(response.status).toBe(429);
+  });
+});
+
+describe("POST /api/analysis-sessions/:id/retry", () => {
+  it("rejects retrying a session that isn't in a failed state with 400", async () => {
+    const createResponse = await POST(buildCreateRequest({ startupIdea: "A local tool-lending library app." }));
+    const created = await createResponse.json();
+
+    const { req, context } = buildMutateRequest(created.session.id);
+    const response = await retryPOST(req, context);
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain("Cannot retry");
+  });
+
+  it("returns the app's documented not-found response for a nonexistent session id", async () => {
+    const { req, context } = buildMutateRequest("session-does-not-exist");
+    const response = await retryPOST(req, context);
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe('No analysis session found for id "session-does-not-exist".');
+  });
+
+  it("rejects the request with 429 when the caller has exceeded the mutate rate limit", async () => {
+    const createResponse = await POST(buildCreateRequest({ startupIdea: "A neighborhood tool-share app." }));
+    const created = await createResponse.json();
+
+    mockedCheckRateLimit.mockResolvedValue({ allowed: false, limit: 20, remaining: 0 });
+
+    const { req, context } = buildMutateRequest(created.session.id);
+    const response = await retryPOST(req, context);
+
+    expect(response.status).toBe(429);
   });
 });
