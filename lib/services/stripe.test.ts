@@ -389,6 +389,15 @@ describe("getUserTier", () => {
 
     consoleErrorSpy.mockRestore();
   });
+
+  it("returns 'founder' for the FOUNDER_USER_ID override, independently of the subscription row's own status", async () => {
+    vi.stubEnv("FOUNDER_USER_ID", "user-1");
+    mockedCreateClient.mockResolvedValue(
+      createMockAdminClient({ selectResult: { data: { tier: "founder", status: "canceled" }, error: null } }) as never
+    );
+
+    expect(await getUserTier("user-1")).toBe("founder");
+  });
 });
 
 describe("getSubscriptionDetails", () => {

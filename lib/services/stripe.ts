@@ -286,6 +286,13 @@ export async function handleInvoicePaymentFailed(event: Stripe.Event): Promise<v
 // stays confined to the three webhook handlers above, which have no
 // session to read through at all.
 export async function getUserTier(userId: string): Promise<SubscriptionTier> {
+  // Founder-account override: unlimited access independently of any
+  // Stripe subscription row/status. Server-side only — never a
+  // NEXT_PUBLIC_ variable.
+  if (process.env.FOUNDER_USER_ID && userId === process.env.FOUNDER_USER_ID) {
+    return "founder";
+  }
+
   const supabase = await createClient();
 
   const { data, error } = await supabase
