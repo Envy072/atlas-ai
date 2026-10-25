@@ -7,6 +7,8 @@ import { resolveCallerContext } from "@/lib/api/clientIdentity";
 import { assertRequestNotTooLarge } from "@/lib/api/requestSize";
 import { jsonSuccess, jsonError } from "@/lib/api/response";
 import { InvalidRequestError, UsageLimitExceededError, RateLimitExceededError } from "@/lib/errors";
+import { trackServerEvent } from "@/lib/analytics/server";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 // The real 6-stage pipeline runs synchronously inside this one request
 // (Milestone 45 investigation) and can legitimately take 20-40+
@@ -75,6 +77,20 @@ export async function POST(req: Request) {
 
     return jsonSuccess(view, 201);
   } catch (error) {
+    // Diagnostic record for the expected Free-tier quota rejection only
+    // (never a blanket "log every 403" — jsonError() already keeps an
+    // AppError, this one included, out of its own unexpected-error
+    // logging/Sentry/UNEXPECTED_SERVER_ERROR path). Properties are fixed,
+    // structural facts only — a hardcoded route identifier, the error's
+    // own status/code — never a user id, email, IP, request body, or any
+    // other caller-identifying value.
+    if (error instanceof UsageLimitExceededError) {
+      await trackServerEvent(ANALYTICS_EVENTS.ANALYSIS_QUOTA_REJECTED, "server", {
+        route: "/api/analysis-sessions",
+        status: error.status,
+        code: error.code,
+      });
+    }
     return jsonError(error);
   }
 }

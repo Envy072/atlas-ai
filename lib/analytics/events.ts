@@ -22,6 +22,14 @@ export const ANALYTICS_EVENTS = {
   ANALYSIS_COMPLETED: "analysis_completed",
   ANALYSIS_FAILED: "analysis_failed",
   ANALYSIS_CANCELLED: "analysis_cancelled",
+  // The expected Free-tier monthly-cap rejection (UsageLimitExceededError,
+  // app/api/analysis-sessions/route.ts) — a business-rule outcome, not a
+  // bug, so it's tracked here rather than through jsonError()'s own
+  // UNEXPECTED_SERVER_ERROR path (which deliberately never fires for an
+  // AppError). Properties are limited to fixed, structural facts: the
+  // route, the HTTP status, and the AppError's own `code` — never a user
+  // id, email, or anything else that could identify the caller.
+  ANALYSIS_QUOTA_REJECTED: "analysis_quota_rejected",
 
   // Projects
   PROJECT_OPENED: "project_opened",

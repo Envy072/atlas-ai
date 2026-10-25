@@ -87,6 +87,13 @@ vi.mock("@/lib/services/rateLimit", async (importOriginal) => {
   return { ...actual, checkRateLimit: vi.fn() };
 });
 
+// The quota-rejection diagnostic event (route.ts's own catch block) —
+// mocked via the same vi.hoisted pattern lib/api/response.test.ts
+// already established for this exact module, so these tests can assert
+// the real capture-or-not decision deterministically.
+const { trackServerEventMock } = vi.hoisted(() => ({ trackServerEventMock: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/lib/analytics/server", () => ({ trackServerEvent: trackServerEventMock }));
+
 import { createClient } from "@/lib/supabase/server";
 import { getUserTier } from "@/lib/services/stripe";
 import { countProjectsThisMonth } from "@/lib/services/projects";
@@ -225,6 +232,32 @@ describe("POST /api/analysis-sessions → GET /api/analysis-sessions/:id", () =>
 
     expect(response.status).toBe(201);
     expect(mockedCountProjectsThisMonth).not.toHaveBeenCalled();
+  });
+
+  it("reports ANALYSIS_QUOTA_REJECTED with only safe, structural fields when the monthly cap is hit", async () => {
+    mockedCreateClient.mockResolvedValue(createMockSupabaseClient({ user: FAKE_USER }));
+    mockedGetUserTier.mockResolvedValue("free");
+    mockedCountProjectsThisMonth.mockResolvedValue(2);
+    trackServerEventMock.mockClear();
+
+    const response = await POST(buildCreateRequest({ startupIdea: "One idea too many this month." }));
+
+    expect(response.status).toBe(403);
+    expect(trackServerEventMock).toHaveBeenCalledTimes(1);
+    expect(trackServerEventMock).toHaveBeenCalledWith("analysis_quota_rejected", "server", {
+      route: "/api/analysis-sessions",
+      status: 403,
+      code: "usage_limit_exceeded",
+    });
+  });
+
+  it("does not report ANALYSIS_QUOTA_REJECTED for an unrelated error", async () => {
+    trackServerEventMock.mockClear();
+
+    const response = await POST(buildCreateRequest({ startupIdea: "" }));
+
+    expect(response.status).toBe(400);
+    expect(trackServerEventMock).not.toHaveBeenCalled();
   });
 });
 

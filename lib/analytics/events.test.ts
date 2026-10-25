@@ -13,6 +13,7 @@ describe("ANALYTICS_EVENTS", () => {
         "analysis_completed",
         "analysis_failed",
         "analysis_cancelled",
+        "analysis_quota_rejected",
         "project_opened",
         "project_deleted",
         "executive_summary_viewed",
