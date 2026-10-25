@@ -398,6 +398,15 @@ describe("getUserTier", () => {
 
     expect(await getUserTier("user-1")).toBe("founder");
   });
+
+  it("does not apply the FOUNDER_USER_ID override to a non-matching user", async () => {
+    vi.stubEnv("FOUNDER_USER_ID", "user-1");
+    mockedCreateClient.mockResolvedValue(
+      createMockAdminClient({ selectResult: { data: null, error: null } }) as never
+    );
+
+    expect(await getUserTier("user-2")).toBe("free");
+  });
 });
 
 describe("getSubscriptionDetails", () => {
